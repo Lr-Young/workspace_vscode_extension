@@ -1,33 +1,112 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "workspace" is now active!');
-
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
 	const disposable = vscode.commands.registerCommand('workspace.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
+
 		vscode.window.showInformationMessage('Hello World from workspace!');
 	});
 
-	// const cat = vscode.chat.createChatParticipant('chat-sample.cat', handler);
+  context.subscriptions.push(disposable);
 
-	// // Optionally, set some properties for @cat
-	// cat.iconPath = vscode.Uri.joinPath(context.extensionUri, 'cat.jpeg');
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      'chat-assistant-view',
+      new ChatAssistantViewProvider(context)
+    )
+  );
 
-	// Add the chat request handler here
-
-	context.subscriptions.push(disposable);
 }
 
-// This method is called when your extension is deactivated
-export function deactivate() {}
+class ChatAssistantViewProvider implements vscode.WebviewViewProvider {
+
+  constructor(private readonly context: vscode.ExtensionContext) {}
+
+  resolveWebviewView(webviewView: vscode.WebviewView): void {
+
+    console.log(this.context.extensionUri);
+	
+    vscode.window.showInformationMessage('Chat Assistant View is now active!');
+
+    // 初始化时，在 Webview 中显示加载动画
+    webviewView.webview.html = `<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>加载中</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+        }
+        
+        .loading-text {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            color: #333;
+        }
+        
+        .loader {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-text">正在加载 WORKSPACE CHAT AGENT</div>
+    <div class="loader"></div>
+</body>
+</html>`;
+
+    webviewView.webview.options = {
+      enableScripts: true,
+    };
+
+    // webviewView.webview.html = this.getHtml(webviewView.webview);
+
+    // 接收来自 Webview 的消息
+    webviewView.webview.onDidReceiveMessage(async message => {
+      if (message.command === 'askLLM') {
+        const response = await askLLM(message.text);
+        webviewView.webview.postMessage({ command: 'reply', text: response });
+      }
+    });
+  }
+
+  private getHtml(webview: vscode.Webview): string {
+    const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'script.js'));
+    const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'style.css'));
+
+    return `<!DOCTYPE html>`;
+
+  }
+
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function askLLM(prompt: string): Promise<string> {
+	await sleep(1000);
+	return "你好，我是LLM";
+}
+
