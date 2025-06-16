@@ -16,6 +16,10 @@
       {
         "command": "workspace.helloWorld",
         "title": "Hello World"
+      },
+      {
+        "command": "workspace.benchmark",
+        "title": "Workspace Benchmark"
       }
     ],
     "viewsContainers": {
@@ -51,10 +55,17 @@
     "@types/node": "20.x",
     "@typescript-eslint/eslint-plugin": "^8.25.0",
     "@typescript-eslint/parser": "^8.25.0",
-    "eslint": "^9.21.0",
-    "typescript": "^5.7.3",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
-    "@vscode/webview-ui-toolkit": "^1.4.0"
+    "@vscode/webview-ui-toolkit": "^1.4.0",
+    "esbuild": "^0.16.10",
+    "esbuild-plugin-copy": "^2.0.1",
+    "eslint": "^9.21.0",
+    "glob": "^8.0.3",
+    "prettier": "^2.8.1",
+    "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "@vscode/webview-ui-toolkit": "^1.2.2"
   }
 }

@@ -15,10 +15,29 @@ provideVSCodeDesignSystem().register(allComponents);
 // or toolkit components
 window.addEventListener("load", main);
 
+window.confirm("This is a confirmation dialog. Do you want to proceed?") &&
+  console.log("User confirmed the action.");
+
 function main() {
   // Set checkbox indeterminate state
   const checkbox = document.getElementById("basic-checkbox") as Checkbox;
   checkbox.indeterminate = true;
+
+  const benchmarkStatisticsGrid = document.getElementById("dataset-statistics-grid") as DataGrid;
+  benchmarkStatisticsGrid.rowsData = [
+    {
+      key: "问题类型",
+      value: "50",
+    },
+    {
+      key: "实例问题数量",
+      value: "83",
+    },
+    {
+      key: "代码仓库数量",
+      value: "1",
+    },
+  ];
 
   // Define default data grid
   const defaultDataGrid = document.getElementById("default-grid") as DataGrid;

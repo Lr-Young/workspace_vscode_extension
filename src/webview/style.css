@@ -2,6 +2,30 @@
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
 }
+/* 
+轨道可以使用任何长度单位进行定义。
+网格引入了 fr 单位来帮助我们创建灵活的网格轨道。一个 fr 单位代表网格容器中可用空间的一等份。
+ */
+
+#grid-one-column {
+  display: grid;
+  grid-template-columns: repeat(1, 1fr);
+}
+
+#grid-two-column {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+#grid-three-column {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+#grid-four-column {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
 
 #data-grid-row,
 #panels-row {
@@ -19,6 +43,13 @@
   border: 2px dashed #7b61ff;
   border-radius: 5px;
 }
+
+/*
+margin: top right bottom left;
+margin: top left-right bottom;
+margin: top-bottom left-right;
+margin: all-sides;
+*/
 
 .component-container > * {
   margin: 0.25rem 0;
@@ -38,3 +69,5 @@ vscode-panels {
   border: 2px dashed #7b61ff;
   border-radius: 5px;
 }
+
+/* todo: 网格线颜色 #3C3C3C; */

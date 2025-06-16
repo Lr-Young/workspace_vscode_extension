@@ -1,35 +1,48 @@
 import * as vscode from 'vscode';
+import { BenchmarkWebviewPanel } from './benchmark/benchmarkWebviewPanel';
 
 export async function activate(context: vscode.ExtensionContext) {
 
-	const disposable = vscode.commands.registerCommand('workspace.helloWorld', () => {
+	vscode.window.showInformationMessage('Workspace Extension begins activation...');
+	console.log('Workspace Extension begins activation...');
 
-		vscode.window.showInformationMessage('Hello World from workspace!');
-	});
+	context.subscriptions.push(
+		vscode.commands.registerCommand('workspace.helloWorld', () => {
+			vscode.window.showInformationMessage('Hello World from workspace!');
+		})
+	);
 
-  context.subscriptions.push(disposable);
+	context.subscriptions.push(
+		vscode.window.registerWebviewViewProvider(
+			'chat-assistant-view',
+			new ChatAssistantViewProvider(context)
+		)
+	);
 
-  context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(
-      'chat-assistant-view',
-      new ChatAssistantViewProvider(context)
-    )
-  );
+	context.subscriptions.push(
+		vscode.commands.registerCommand('workspace.benchmark', () => {
+			BenchmarkWebviewPanel.render(context.extensionUri);
+			vscode.window.showInformationMessage('Benchmark Webview Panel is now active!');
+		})
+	);
+
+	vscode.window.showInformationMessage('Workspace Extension is now active!');
+	console.log('Workspace Extension is now active!');
 
 }
 
 class ChatAssistantViewProvider implements vscode.WebviewViewProvider {
 
-  constructor(private readonly context: vscode.ExtensionContext) {}
+	constructor(private readonly context: vscode.ExtensionContext) { }
 
-  resolveWebviewView(webviewView: vscode.WebviewView): void {
+	resolveWebviewView(webviewView: vscode.WebviewView): void {
 
-    console.log(this.context.extensionUri);
-	
-    vscode.window.showInformationMessage('Chat Assistant View is now active!');
+		console.log(this.context.extensionUri);
 
-    // 初始化时，在 Webview 中显示加载动画
-    webviewView.webview.html = `<!DOCTYPE html>
+		vscode.window.showInformationMessage('Chat Assistant View is now active!');
+
+		// 初始化时，在 Webview 中显示加载动画
+		webviewView.webview.html = `<!DOCTYPE html>
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
@@ -76,33 +89,33 @@ class ChatAssistantViewProvider implements vscode.WebviewViewProvider {
 </body>
 </html>`;
 
-    webviewView.webview.options = {
-      enableScripts: true,
-    };
+		webviewView.webview.options = {
+			enableScripts: true,
+		};
 
-    // webviewView.webview.html = this.getHtml(webviewView.webview);
+		// webviewView.webview.html = this.getHtml(webviewView.webview);
 
-    // 接收来自 Webview 的消息
-    webviewView.webview.onDidReceiveMessage(async message => {
-      if (message.command === 'askLLM') {
-        const response = await askLLM(message.text);
-        webviewView.webview.postMessage({ command: 'reply', text: response });
-      }
-    });
-  }
+		// 接收来自 Webview 的消息
+		webviewView.webview.onDidReceiveMessage(async message => {
+			if (message.command === 'askLLM') {
+				const response = await askLLM(message.text);
+				webviewView.webview.postMessage({ command: 'reply', text: response });
+			}
+		});
+	}
 
-  private getHtml(webview: vscode.Webview): string {
-    const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'script.js'));
-    const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'style.css'));
+	private getHtml(webview: vscode.Webview): string {
+		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'script.js'));
+		const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'style.css'));
 
-    return `<!DOCTYPE html>`;
+		return `<!DOCTYPE html>`;
 
-  }
+	}
 
 }
 
 function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+	return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 async function askLLM(prompt: string): Promise<string> {
