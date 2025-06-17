@@ -1,3 +1,4 @@
+const { log, time } = require("console");
 const { build } = require("esbuild");
 const { copy } = require("esbuild-plugin-copy");
 const fs = require('fs');
@@ -28,6 +29,11 @@ function deleteFolderRecursive(dirPath) {
   // 删除空目录
   fs.rmdirSync(dirPath);
   console.log(`已删除目录: ${dirPath}`);
+}
+
+function timedLog(message) {
+  const time = new Date().toLocaleTimeString();
+  console.log(`[${time}] ${message}`);
 }
 
 //@ts-check
@@ -79,15 +85,15 @@ const webviewConfig = {
 const watchConfig = {
   watch: {
     onRebuild(error, result) {
-      console.log("[watch] build started");
       if (error) {
+        timedLog("Rebuild failed");
         error.errors.forEach((error) =>
           console.error(
             `> ${error.location.file}:${error.location.line}:${error.location.column}: error: ${error.text}`
           )
         );
       } else {
-        console.log("[watch] build finished");
+        timedLog("Rebuild complete");
       }
     },
   },
@@ -100,10 +106,7 @@ const watchConfig = {
   try {
     if (args.includes("--watch")) {
       // Build and watch extension and webview code
-      var now = new Date();
-      console.log(
-        `[watch] build started at ${now.toLocaleTimeString()} on ${now.toLocaleDateString()}`
-      );
+      timedLog("Build started. Watching for changes...");
       await build({
         ...extensionConfig,
         ...watchConfig,
@@ -112,10 +115,7 @@ const watchConfig = {
         ...webviewConfig,
         ...watchConfig,
       });
-      now = new Date();
-      console.log(
-        `[watch] build finished at ${now.toLocaleTimeString()} on ${now.toLocaleDateString()}`
-      );
+      timedLog("Build finished. Waiting for changes...");
     } else {
       // Build extension and webview code
       await build(extensionConfig);

@@ -13,6 +13,12 @@ export async function activate(context: vscode.ExtensionContext) {
 	);
 
 	context.subscriptions.push(
+		vscode.commands.registerCommand('workspace.test', () => {
+			vscode.window.showInformationMessage('foler length: ' + vscode.workspace.workspaceFolders?.length);
+		})
+	);
+
+	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider(
 			'chat-assistant-view',
 			new ChatAssistantViewProvider(context)

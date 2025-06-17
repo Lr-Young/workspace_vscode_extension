@@ -5,6 +5,8 @@ import {
   DataGrid,
 } from "@vscode/webview-ui-toolkit";
 
+import { dataLoaders } from "../gui/components";
+
 // In order to use all the Webview UI Toolkit web components they
 // must be registered with the browser (i.e. webview) using the
 // syntax below.
@@ -18,26 +20,25 @@ window.addEventListener("load", main);
 window.confirm("This is a confirmation dialog. Do you want to proceed?") &&
   console.log("User confirmed the action.");
 
+function loadData(): void {
+  for (const [id, dataLoader] of Object.entries(dataLoaders)) {
+    const element = document.getElementById(id);
+    if (element) {
+      dataLoader(id);
+    } else {
+      console.warn(`No element found with id: ${id}`);
+    }
+  }
+}
+
 function main() {
+
+  // Load data for all components that require it
+  loadData();
+
   // Set checkbox indeterminate state
   const checkbox = document.getElementById("basic-checkbox") as Checkbox;
   checkbox.indeterminate = true;
-
-  const benchmarkStatisticsGrid = document.getElementById("dataset-statistics-grid") as DataGrid;
-  benchmarkStatisticsGrid.rowsData = [
-    {
-      key: "问题类型",
-      value: "50",
-    },
-    {
-      key: "实例问题数量",
-      value: "83",
-    },
-    {
-      key: "代码仓库数量",
-      value: "1",
-    },
-  ];
 
   // Define default data grid
   const defaultDataGrid = document.getElementById("default-grid") as DataGrid;

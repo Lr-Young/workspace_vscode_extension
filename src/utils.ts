@@ -1,4 +1,4 @@
-import { Uri, Webview } from "vscode";
+import { Uri, Webview, workspace } from "vscode";
 
 /**
  * A helper function which will get the webview URI of a given file or resource.
@@ -25,11 +25,17 @@ export function getUri(webview: Webview, extensionUri: Uri, ...pathList: string[
  * @returns A nonce
  */
 export function getNonce() {
-    let text = "";
-    const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    for (let i = 0; i < 32; i++) {
-      text += possible.charAt(Math.floor(Math.random() * possible.length));
-    }
-    return text;
+  let text = "";
+  const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  for (let i = 0; i < 32; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
   }
-  
+  return text;
+}
+
+export function workspaceFolderCount(): number {
+  if (workspace.workspaceFolders === undefined) {
+    return 0;
+  }
+  return workspace.workspaceFolders.length;
+}

@@ -70,4 +70,10 @@ vscode-panels {
   border-radius: 5px;
 }
 
+vscode-data-grid,
+vscode-panels {
+  border: 2px solid #3C3C3C;
+  border-radius: 5px;
+}
+
 /* todo: 网格线颜色 #3C3C3C; */

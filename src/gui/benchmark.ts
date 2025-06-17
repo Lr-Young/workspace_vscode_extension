@@ -14,8 +14,7 @@ import { tagDemo } from "./demos/tag";
 import { textAreaDemo } from "./demos/text-area";
 import { textFieldDemo } from "./demos/text-field";
 
-import { datasetStatisticsHtml } from "./component/dataset-statistics";
-import { datasetQuestionTypeHtml } from "./component/dataset-question-type";
+import { htmlComponents } from "./components";
 
 export function getWebviewContent(webview: Webview, extensionUri: Uri) {
 	const webviewUri = getUri(webview, extensionUri, "out", "webview.js");
@@ -45,13 +44,13 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
 					<vscode-divider role="separator"></vscode-divider>
 
 					<section id="grid-one-column">
-						${datasetStatisticsHtml}
+						${htmlComponents.datasetStatistics}
 					</section>
 					<vscode-divider role="separator"></vscode-divider>
 
 					<section id="grid-two-column">
-						${datasetQuestionTypeHtml}
-						${datasetQuestionTypeHtml}
+						${htmlComponents.datasetQuestionType}
+						${htmlComponents.datasetQuestionType}
 					</section>
 					<vscode-divider role="separator"></vscode-divider>
 
