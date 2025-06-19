@@ -3,8 +3,12 @@ import {
   provideVSCodeDesignSystem,
   Checkbox,
   DataGrid,
+  Button,
 } from "@vscode/webview-ui-toolkit";
 
+import { window as vscode_window } from 'vscode';
+
+import { getAllFilesContent } from '../benchmark/main';
 import { dataLoaders } from "../gui/components";
 
 // In order to use all the Webview UI Toolkit web components they
@@ -35,6 +39,14 @@ function main() {
 
   // Load data for all components that require it
   loadData();
+
+  const buttonBenchmarkConstructing = document.getElementById("button-benchmark-constructing") as Button;
+
+  buttonBenchmarkConstructing.onclick = (event) => {
+    vscode_window.showInformationMessage("button clicked");
+    getAllFilesContent();
+  };
+  
 
   // Set checkbox indeterminate state
   const checkbox = document.getElementById("basic-checkbox") as Checkbox;

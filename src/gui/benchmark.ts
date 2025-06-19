@@ -43,6 +43,14 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
           <h1>Workspace Benchmark Dataset</h1>
 					<vscode-divider role="separator"></vscode-divider>
 
+          <section id="grid-one-column">
+            <h2>Current Workspace Benchmark Construction</h2>
+            <section class="component-example">
+              <vscode-button appearance="primary" id="button-benchmark-constructing">Begin Constructing Benchmark</vscode-button>
+            </section>
+					</section>
+					<vscode-divider role="separator"></vscode-divider>
+
 					<section id="grid-one-column">
 						${htmlComponents.datasetStatistics}
 					</section>

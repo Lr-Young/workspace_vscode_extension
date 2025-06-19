@@ -1,17 +1,27 @@
 
-export const extractRelevantFileSnippetPrompt: string = ```
+export function getExtractRelevantFileSnippetPrompt(
+  question: string,
+  filePath: string,
+  fileContent: string
+): string {
+  const lines = fileContent.split('\n');
+  const numberedLines = lines.map((line, index) => {
+    return `${index + 1}: ${line}`;
+  });
+  fileContent = numberedLines.join('\n');
+  return `
 You are a code comprehension assistant.  
 Your job is to find **all** contiguous spans of code or text in a single file that are necessary to answer a given question about the code base.  
 
 —— INPUT ——
 Question:
-“{{QUESTION}}”
+${question.trim()}”
 
 File path:
-“{{RELATIVE_PATH}}”
+“${filePath.trim()}”
 
 File content (with line numbers):
-{{FILE_CONTENT_WITH_LINE_NUMBERS}}
+${fileContent.trim()}
 
 —— INSTRUCTIONS ——
 1. Read the **Question** carefully; identify its key target(s) (e.g. function, variable, module identifiers etc.).  
@@ -45,4 +55,6 @@ I see that \`functionA\` is declared on lines 12-17 and its comment above on lin
   { "start": 10, "end": 17 },
   { "start": 30, "end": 45 }
 ]
-```;
+`.trim();
+}
+
