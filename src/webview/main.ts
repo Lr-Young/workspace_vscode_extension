@@ -6,10 +6,9 @@ import {
   Button,
 } from "@vscode/webview-ui-toolkit";
 
-import { window as vscode_window } from 'vscode';
-
-import { getAllFilesContent } from '../benchmark/main';
 import { dataLoaders } from "../gui/components";
+
+const vscode = acquireVsCodeApi();
 
 // In order to use all the Webview UI Toolkit web components they
 // must be registered with the browser (i.e. webview) using the
@@ -43,8 +42,17 @@ function main() {
   const buttonBenchmarkConstructing = document.getElementById("button-benchmark-constructing") as Button;
 
   buttonBenchmarkConstructing.onclick = (event) => {
-    vscode_window.showInformationMessage("button clicked");
-    getAllFilesContent();
+    vscode.postMessage({
+      command: "benchmarkConstruct",
+    });
+  };
+
+  const buttonBenchmarkConstructingTest = document.getElementById("button-benchmark-constructing-test") as Button;
+
+  buttonBenchmarkConstructingTest.onclick = (event) => {
+    vscode.postMessage({
+      command: "test",
+    });
   };
   
 

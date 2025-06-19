@@ -1,5 +1,6 @@
 import { Disposable, Uri, WebviewPanel, window, ViewColumn } from "vscode";
 import { getWebviewContent } from "../gui/benchmark";
+import { getAllFilesContent, getAllFilesContentFast } from "../benchmark/main";
 
 export class BenchmarkWebviewPanel {
 
@@ -15,6 +16,20 @@ export class BenchmarkWebviewPanel {
 		this._webviewPanel.onDidDispose(() => { this.dispose(); }, null, this._disposable);
 
 		this._webviewPanel.webview.html = getWebviewContent(this._webviewPanel.webview, extionsionUri);
+
+		this._webviewPanel.webview.onDidReceiveMessage(
+			message => {
+				switch (message.command) {
+					case 'benchmarkConstruct':
+						const n = 10;
+						getAllFilesContent();
+						return;
+					case 'test':
+						getAllFilesContentFast();
+						return;
+				}
+			}
+		);
 	}
 
 	public static render(extensionUri: Uri): void {

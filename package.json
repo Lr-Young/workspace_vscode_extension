@@ -50,7 +50,7 @@
     "vscode:prepublish": "npm run package",
     "compile": "node ./esbuild.js",
     "package": "NODE_ENV=production node ./esbuild.js",
-    "watch": "node ./esbuild.js --watch",
+    "watch": "node ./esbuild.js",
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {
@@ -70,7 +70,9 @@
     "typescript": "^5.7.3"
   },
   "dependencies": {
+    "@types/vscode-webview": "^1.57.5",
     "@vscode/webview-ui-toolkit": "^1.2.2",
+    "fast-glob": "^3.3.3",
     "tree-sitter": "^0.22.4",
     "tree-sitter-python": "^0.23.6"
   }

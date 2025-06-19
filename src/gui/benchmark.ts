@@ -48,6 +48,9 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
             <section class="component-example">
               <vscode-button appearance="primary" id="button-benchmark-constructing">Begin Constructing Benchmark</vscode-button>
             </section>
+            <section class="component-example">
+              <vscode-button appearance="primary" id="button-benchmark-constructing-test">Begin Constructing Benchmark Fast</vscode-button>
+            </section>
 					</section>
 					<vscode-divider role="separator"></vscode-divider>
 
