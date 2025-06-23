@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fg from 'fast-glob';
 import { workspaceFolderCount } from '../utils';
 
-interface FileChunk {
+export interface FileChunk {
     readonly filePath: string;
     readonly startLine: number;
     readonly endLine: number;
@@ -22,7 +22,6 @@ const excludePattern = "";
 /**
  * 获取工作区所有文件的内容和相对路径
  */
-
 
 export async function getAllFilesContent() {
 
