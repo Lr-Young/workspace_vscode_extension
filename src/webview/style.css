@@ -7,22 +7,22 @@
 网格引入了 fr 单位来帮助我们创建灵活的网格轨道。一个 fr 单位代表网格容器中可用空间的一等份。
  */
 
-#grid-one-column {
+.grid-one-column {
   display: grid;
   grid-template-columns: repeat(1, 1fr);
 }
 
-#grid-two-column {
+.grid-two-column {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
 }
 
-#grid-three-column {
+.grid-three-column {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
 }
 
-#grid-four-column {
+.grid-four-column {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
 }
@@ -77,3 +77,24 @@ vscode-panels {
 }
 
 /* todo: 网格线颜色 #3C3C3C; */
+
+#placeholder-section {
+  display: none;
+}
+
+/* #placeholder-instances-grid {
+  display: none;
+} */
+
+#question-instances-grid {
+  display: none;
+}
+
+.parent {
+  display: flex;      /* 启用 Flexbox 布局 */
+  gap: 10px;          /* 子元素间距（可选） */
+}
+
+.test-p {
+  white-space: pre-line;
+}

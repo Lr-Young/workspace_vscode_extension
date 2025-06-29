@@ -1,0 +1,11 @@
+"filename", "language", "TypeScript", "PostCSS", "comment", "blank", "total"
+"c:\Users\lry72\code\workspace_vscode_extension\src\benchmark\benchmarkWebviewPanel.ts", "TypeScript", 4, 0, 0, 0, 4
+"c:\Users\lry72\code\workspace_vscode_extension\src\benchmark\languageAnalyser\pythonParser.ts", "TypeScript", 3, 0, 0, 1, 4
+"c:\Users\lry72\code\workspace_vscode_extension\src\benchmark\main.ts", "TypeScript", 23, 0, 0, 2, 25
+"c:\Users\lry72\code\workspace_vscode_extension\src\benchmark\typeDefinitions.ts", "TypeScript", 6, 0, 0, 2, 8
+"c:\Users\lry72\code\workspace_vscode_extension\src\extension.ts", "TypeScript", -5, 0, 0, -2, -7
+"c:\Users\lry72\code\workspace_vscode_extension\src\gui\benchmark.ts", "TypeScript", 1, 0, 0, 0, 1
+"c:\Users\lry72\code\workspace_vscode_extension\src\gui\components.ts", "TypeScript", -1, 0, 0, -1, -2
+"c:\Users\lry72\code\workspace_vscode_extension\src\webview\main.ts", "TypeScript", 74, 0, 1, 22, 97
+"c:\Users\lry72\code\workspace_vscode_extension\src\webview\style.css", "PostCSS", 0, 3, 3, 2, 8
+"Total", "-", 105, 3, 4, 26, 138

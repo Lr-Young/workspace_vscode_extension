@@ -20,10 +20,6 @@
       {
         "command": "workspace.benchmark",
         "title": "Workspace Benchmark"
-      },
-      {
-        "command": "workspace.test",
-        "title": "Test Command"
       }
     ],
     "viewsContainers": {
@@ -54,6 +50,7 @@
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.1",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
     "@types/vscode": "^1.98.0",
@@ -74,7 +71,6 @@
     "@vscode/webview-ui-toolkit": "^1.2.2",
     "fast-glob": "^3.3.3",
     "tree-sitter": "^0.22.4",
-    "tree-sitter-python": "^0.23.6",
-    "walkdir": "^0.4.1"
+    "tree-sitter-python": "^0.23.6"
   }
 }

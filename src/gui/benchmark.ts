@@ -1,5 +1,5 @@
 import { Webview, Uri } from "vscode";
-import { getUri, getNonce } from "../utils";
+import { getNonce } from "../utils";
 import { badgeDemo } from "./demos/badge";
 import { buttonDemo } from "./demos/button";
 import { checkboxDemo } from "./demos/checkbox";
@@ -16,6 +16,10 @@ import { textFieldDemo } from "./demos/text-field";
 
 import { htmlComponents } from "./components";
 
+function getUri(webview: Webview, extensionUri: Uri, ...pathList: string[]) {
+  return webview.asWebviewUri(Uri.joinPath(extensionUri, ...pathList));
+}
+
 export function getWebviewContent(webview: Webview, extensionUri: Uri) {
 	const webviewUri = getUri(webview, extensionUri, "out", "webview.js");
 	const styleUri = getUri(webview, extensionUri, "out", "style.css");
@@ -28,70 +32,89 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
 	//
 	// Tip: Install the es6-string-html VS Code extension to enable code highlighting below
 	return /*html*/ `
-		<!DOCTYPE html>
-      <html lang="en">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; font-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
-          <link rel="stylesheet" href="${styleUri}">
-          <link rel="stylesheet" href="${codiconUri}">
-          <title>Workspace Benchmark</title>
-        </head>
-        <body>
+<!DOCTYPE html>
+<html lang="en">
 
-          <h1>Workspace Benchmark Dataset</h1>
-					<vscode-divider role="separator"></vscode-divider>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; font-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+    <link rel="stylesheet" href="${styleUri}">
+    <link rel="stylesheet" href="${codiconUri}">
+    <title>Workspace Benchmark</title>
+</head>
 
-          <section id="grid-one-column">
-            <h2>Current Workspace Benchmark Construction</h2>
-            <section class="component-example">
-              <vscode-button appearance="primary" id="button-benchmark-constructing">Begin Constructing Benchmark</vscode-button>
-            </section>
-            <section class="component-example">
-              <vscode-button appearance="primary" id="button-benchmark-constructing-test">Begin Constructing Benchmark Fast</vscode-button>
-            </section>
-					</section>
-					<vscode-divider role="separator"></vscode-divider>
+<body>
 
-					<section id="grid-one-column">
-						${htmlComponents.datasetStatistics}
-					</section>
-					<vscode-divider role="separator"></vscode-divider>
+    <h1>Workspace Benchmark Dataset</h1>
+    <vscode-divider role="separator"></vscode-divider>
 
-					<section id="grid-two-column">
-						${htmlComponents.datasetQuestionType}
-						${htmlComponents.datasetQuestionType}
-					</section>
-					<vscode-divider role="separator"></vscode-divider>
+	<div id="test"></div>
+	<vscode-divider role="separator"></vscode-divider>
 
-          <section class="component-row">
-            ${badgeDemo}
-            ${buttonDemo}
-            ${checkboxDemo}
-          </section>
-          <section id="data-grid-row">
-            ${dataGridDemo}
-          </section>
-          <section class="component-row">
-            ${dividerDemo}
-            ${dropdownDemo}
-            ${linkDemo}
-          </section>
-          <section id="panels-row">
-            ${panelsDemo}
-          </section>
-          <section class="component-row">
-            ${progressRingDemo}
-            ${radioGroupDemo}
-            ${tagDemo}
-          </section>
-          <section class="component-row">
-            ${textAreaDemo}
-            ${textFieldDemo}
-          </section>
-          <script type="module" nonce="${nonce}" src="${webviewUri}"></script>
-        </body>
-      </html>
-	`;
+    <section class="grid-one-column">
+        <section class="component-example">
+            <vscode-button appearance="primary" id="button-benchmark-constructing">Begin Constructing Benchmark</vscode-button>
+        </section>
+    </section>
+    <vscode-divider role="separator"></vscode-divider>
+
+	<div id="placeholder-section">
+		<section class="grid-one-column">
+			<section class="component-container">
+				<div class="parent">
+					<h3 id="placeholder-instantiate-header">Placeholder Instantiating</h3>
+					<vscode-progress-ring id="benchmark-progress-ring"></vscode-progress-ring>
+				</div>
+
+                <vscode-data-grid id="placeholder-instances-grid" grid-template-columns="1fr 1fr"></vscode-data-grid>
+
+                <vscode-data-grid id="question-instances-grid" grid-template-columns="1fr 1fr 1fr"></vscode-data-grid>
+
+			</section>
+		</section>
+		<vscode-divider role="separator"></vscode-divider>
+	</div>
+
+    <section class="grid-one-column">
+        ${htmlComponents.datasetStatistics}
+    </section>
+    <vscode-divider role="separator"></vscode-divider>
+
+    <section class="grid-two-column">
+        ${htmlComponents.datasetQuestionType}
+        ${htmlComponents.datasetQuestionType}
+    </section>
+    <vscode-divider role="separator"></vscode-divider>
+
+    <section class="component-row">
+        ${badgeDemo}
+        ${buttonDemo}
+        ${checkboxDemo}
+    </section>
+    <section id="data-grid-row">
+        ${dataGridDemo}
+    </section>
+    <section class="component-row">
+        ${dividerDemo}
+        ${dropdownDemo}
+        ${linkDemo}
+    </section>
+    <section id="panels-row">
+        ${panelsDemo}
+    </section>
+    <section class="component-row">
+        ${progressRingDemo}
+        ${radioGroupDemo}
+        ${tagDemo}
+    </section>
+    <section class="component-row">
+        ${textAreaDemo}
+        ${textFieldDemo}
+    </section>
+    <script type="module" nonce="${nonce}" src="${webviewUri}"></script>
+</body>
+
+</html>
+	`.trim();
 }

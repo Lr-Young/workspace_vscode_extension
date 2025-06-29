@@ -2,6 +2,7 @@ const { log, time } = require("console");
 const { build } = require("esbuild");
 const { copy } = require("esbuild-plugin-copy");
 const fs = require('fs');
+const { platform } = require("os");
 const path = require('path');
 
 function deleteFolderRecursive(dirPath) {
@@ -55,11 +56,11 @@ const extensionConfig = {
   format: "cjs",
   entryPoints: ["./src/extension.ts"],
   outfile: "./out/extension.js",
-  external: ["vscode"],
+  external: ["vscode", "node-gyp-build", "tree-sitter", "tree-sitter-python"],
 };
 
 // Config for webview source code (to be run in a web-based context)
-/** @type BuildOptions */
+/** @type BuildOptions */   
 const webviewConfig = {
   ...baseConfig,
   target: "es2020",
@@ -77,6 +78,16 @@ const webviewConfig = {
       watch: true,
     }),
   ],
+};
+
+const languageParserConfig = {
+  ...baseConfig,
+  platform: 'node',
+  target: 'es2020',
+  format: 'cjs',
+  entryPoints: ["./src/benchmark/languageAnalyser/parser.ts"],
+  outfile: "./out/parser.js",
+  external: ["node-gyp-build", "tree-sitter", "tree-sitter-python"],  // 排除原生模块
 };
 
 // This watch config adheres to the conventions of the esbuild-problem-matchers
@@ -106,7 +117,7 @@ const watchConfig = {
   try {
     if (args.includes("--watch")) {
       // Build and watch extension and webview code
-      timedLog("Build started. Watching for changes...");
+      timedLog("Build --watch started. Watching for changes...");
       await build({
         ...extensionConfig,
         ...watchConfig,
@@ -115,12 +126,18 @@ const watchConfig = {
         ...webviewConfig,
         ...watchConfig,
       });
-      timedLog("Build finished. Waiting for changes...");
+      await build({
+        ...languageParserConfig,
+        ...watchConfig,
+      });
+      timedLog("Build --watch finished. Waiting for changes...");
     } else {
+      timedLog("Build started. Watching for changes...");
       // Build extension and webview code
       await build(extensionConfig);
       await build(webviewConfig);
-      console.log("build complete");
+      await build(languageParserConfig);
+      timedLog("Build completed");
     }
   } catch (err) {
     process.stderr.write(err.stderr);

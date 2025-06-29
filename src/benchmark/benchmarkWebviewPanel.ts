@@ -1,6 +1,7 @@
 import { Disposable, Uri, WebviewPanel, window, ViewColumn } from "vscode";
 import { getWebviewContent } from "../gui/benchmark";
-import { getAllFilesContent, getAllFilesContentFast } from "../benchmark/main";
+import { constructBenchmark } from "../benchmark/main";
+import { handleLink } from './main';
 
 export class BenchmarkWebviewPanel {
 
@@ -21,11 +22,10 @@ export class BenchmarkWebviewPanel {
 			message => {
 				switch (message.command) {
 					case 'benchmarkConstruct':
-						const n = 10;
-						getAllFilesContent();
+						constructBenchmark(this._webviewPanel.webview);
 						return;
-					case 'test':
-						getAllFilesContentFast();
+					case 'link':
+						handleLink(message.type, message.value);
 						return;
 				}
 			}

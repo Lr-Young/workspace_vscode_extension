@@ -1,17 +1,11 @@
-import * as vscode from 'vscode';
-import * as fg from 'fast-glob';
-import { relative } from 'path';
 
-import { FileChunk } from '../main';
-import { workspaceFolderCount } from '../../utils';
-import { PlaceHolder } from '../templates';
+import { FileChunk, Placeholder, PlaceholderInstance } from '../typeDefinitions';
 import { PythonCodeParser } from './pythonParser';
+import * as path from 'path';
 
-const Parser = require("tree-sitter");
+import Parser = require('tree-sitter');
 
-let extToParser: Record<string, CodeParser> = {};
-
-export type PlaceHolderInstance = Record<string, Set<string>>;
+const extToParser: Record<string, CodeParser> = {};
 
 export enum Language {
 	JavaScript = 'JavaScript',
@@ -35,70 +29,34 @@ export interface CodeChunk extends FileChunk {
 export interface CodeParser {
 	readonly language: Language;
 	readonly extensions: string[];
-	readonly parser: typeof Parser;
+	readonly parser: Parser;
 	parse(filePath: string): Promise<CodeChunk[]>;
-	parsePlaceHolderInstances(filePath: string): Promise<PlaceHolderInstance>;
+	parsePlaceHolderInstances(filePath: string): Promise<PlaceholderInstance>;
 }
 
-export async function getPlaceHolderInstances(): Promise<PlaceHolderInstance> {
+export async function parseFiles(files: string[]): Promise<PlaceholderInstance> {
+	const instances: PlaceholderInstance = {};
 
-	let instances: PlaceHolderInstance = {};
-
-	Object.values(PlaceHolder).forEach(value => {
-		instances[value] = new Set<string>();
+	Object.values(Placeholder).forEach(value => {
+		instances[value] = [];
 	});
 
-	if (vscode.workspace.workspaceFolders === undefined || workspaceFolderCount() !== 1) {
-		vscode.window.showErrorMessage("请在工作区打开一个目录");
-		return instances;
-	}
-
-	const workspacePath = vscode.workspace.workspaceFolders[0].uri.fsPath;
-
-	const relativePath = (path: string) => {
-		return relative(workspacePath, path);
-	};
-
-	const workspaceFolders = vscode.workspace.workspaceFolders;
-		
-	const files = await fg('**', {
-			cwd: workspacePath,
-			absolute: true,
-			onlyFiles: true,
-			ignore: ['**/node_modules/**'], // 忽略node_modules
-			dot: true // 包含点文件
-	});
-
-	const directories = await fg('**/', {
-			cwd: workspacePath,
-			absolute: true,
-			onlyDirectories: true,
-			ignore: ['**/node_modules/**'],
-			dot: true
-	});
-
-	await Promise.all(files.map(async (filePath) => {
-		console.log(`正在处理文件：${relativePath(filePath)}`);
-		instances[PlaceHolder.File].add(relativePath(filePath));
-		switch (filePath.split('.')[-1]) {
-			case 'py':
-				if (extToParser['.py'] === undefined) {
-					extToParser['.py'] = new PythonCodeParser();
+	for (const filePath of files) {
+		const ext = path.extname(filePath);
+		switch (ext) {
+			case '.py':
+				if (extToParser[ext] === undefined) {
+					extToParser[ext] = new PythonCodeParser();
 				}
 				const placeHolders = await extToParser['.py'].parsePlaceHolderInstances(filePath);
 				Object.entries(placeHolders).forEach(([key, value]) => {
 					value.forEach(element => {
-						instances[key].add(element);
+						instances[key].push(element);
 					});
 				});
 				break;
 		}
-	}));
-
-	directories.forEach(dirPath => {
-		console.log(`正在处理目录：${relativePath(dirPath)}`);
-		instances[PlaceHolder.Folder].add(relativePath(dirPath));
-	});
+	}
 
 	return instances;
 }

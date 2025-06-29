@@ -1,20 +1,11 @@
 import * as vscode from 'vscode';
 import { BenchmarkWebviewPanel } from './benchmark/benchmarkWebviewPanel';
 
-export async function activate(context: vscode.ExtensionContext) {
-
-	vscode.window.showInformationMessage('Workspace Extension begins activation...');
-	console.log('Workspace Extension begins activation...');
+export function activate(context: vscode.ExtensionContext) {
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('workspace.helloWorld', () => {
 			vscode.window.showInformationMessage('Hello World from workspace!');
-		})
-	);
-
-	context.subscriptions.push(
-		vscode.commands.registerCommand('workspace.test', () => {
-			vscode.window.showInformationMessage('foler length: ' + vscode.workspace.workspaceFolders?.length);
 		})
 	);
 
@@ -32,8 +23,6 @@ export async function activate(context: vscode.ExtensionContext) {
 		})
 	);
 
-	vscode.window.showInformationMessage('Workspace Extension is now active!');
-	console.log('Workspace Extension is now active!');
 
 }
 
@@ -42,8 +31,6 @@ class ChatAssistantViewProvider implements vscode.WebviewViewProvider {
 	constructor(private readonly context: vscode.ExtensionContext) { }
 
 	resolveWebviewView(webviewView: vscode.WebviewView): void {
-
-		console.log(this.context.extensionUri);
 
 		vscode.window.showInformationMessage('Chat Assistant View is now active!');
 

@@ -41,9 +41,9 @@ registerTableComponent(
   "Dataset Statistics",
   "dataset-statistics-grid",
   "1fr 1fr",
-  () => {
-    const datasetStatisticsGrid = document.getElementById("dataset-statistics-grid") as DataGrid;
-    datasetStatisticsGrid.rowsData = [
+  (id: string) => {
+    const grid = document.getElementById(id) as DataGrid;
+    grid.rowsData = [
       {
         key: "问题类型",
         value: "50",
@@ -65,9 +65,9 @@ registerTableComponent(
   "Dataset Question types",
   "dataset-question-type-grid",
   "1fr 1fr",
-  () => {
-    const datasetQuestionTypeGrid = document.getElementById("dataset-question-type-grid") as DataGrid;
-    datasetQuestionTypeGrid.rowsData = [
+  (id: string) => {
+    const grid = document.getElementById(id) as DataGrid;
+    grid.rowsData = [
       {
         "question type": "question type 1",
         "placeholders": "placeholder 1, placeholder 2",

@@ -1,10 +1,10 @@
-import * as vscode from 'vscode';
 
-import { CodeChunk, CodeParser, Language, PlaceHolderInstance } from './parser';
-import { PlaceHolder } from '../templates';
+import { CodeChunk, CodeParser, Language } from './parser';
+import { Placeholder, PlaceholderInstance } from '../typeDefinitions';
+import * as fs from 'fs';
 
-import * as Parser from 'tree-sitter';
-import * as Python from 'tree-sitter-python';
+import Parser = require('tree-sitter');
+import Python = require('tree-sitter-python');
 
 export class PythonCodeParser implements CodeParser {
 
@@ -12,7 +12,7 @@ export class PythonCodeParser implements CodeParser {
 
 	readonly language: Language = Language.Python;
 	readonly extensions: string[] = ['.py'];
-	readonly parser;
+	readonly parser: Parser;
 
 	constructor() {
 		this.parser = new Parser();
@@ -34,18 +34,22 @@ export class PythonCodeParser implements CodeParser {
 		];
 	}
 
-	async parsePlaceHolderInstances(filePath: string): Promise<PlaceHolderInstance> {
+	async parsePlaceHolderInstances(filePath: string): Promise<PlaceholderInstance> {
 
-		let instances: PlaceHolderInstance = {};
+		let instances: PlaceholderInstance = {};
 
-		instances[PlaceHolder.Function] = new Set<string>();
-		instances[PlaceHolder.Variable] = new Set<string>();
-		instances[PlaceHolder.Class] = new Set<string>();
+		instances['WorkspacePath'];
+		instances[Placeholder.Function] = [];
+		instances[Placeholder.Variable] = [];
+		instances[Placeholder.Class] = [];
 
-		const content = await vscode.workspace.fs.readFile(vscode.Uri.file(filePath))
-			.then(content => Buffer.from(content).toString('utf-8'));
+		const content: string = await fs.readFileSync(filePath, 'utf8');
 
 		const tree = this.parser.parse(content);
+
+		const locator = (node: Parser.SyntaxNode) => {
+			return `${filePath}#${node.startPosition.row}#${node.text}`;
+		};
 
 		for (let i = 0; i < tree.rootNode.namedChildCount; i++) {
 			const node = tree.rootNode.namedChild(i);
@@ -53,7 +57,7 @@ export class PythonCodeParser implements CodeParser {
 			if (node === null) {
 				continue;
 			}
-			
+
 			if (node.type === 'comment' || node.type === 'string') {
 				continue;
 			}
@@ -61,7 +65,7 @@ export class PythonCodeParser implements CodeParser {
 			if (node.type === 'function_definition') {
 				const nameNode = node.childForFieldName('name');
 				if (nameNode) {
-					instances[PlaceHolder.Function].add(nameNode.text);
+					instances[Placeholder.Function].push(locator(nameNode));
 				}
 				continue;
 			}
@@ -69,7 +73,7 @@ export class PythonCodeParser implements CodeParser {
 			if (node.type === 'class_definition') {
 				const nameNode = node.childForFieldName('name');
 				if (nameNode) {
-					instances[PlaceHolder.Class].add(nameNode.text);
+					instances[Placeholder.Class].push(locator(nameNode));
 				}
 				continue;
 			}
@@ -79,10 +83,10 @@ export class PythonCodeParser implements CodeParser {
 				if (childNode?.type === 'assignment') {
 					const leftSide = childNode.firstNamedChild;
 					if (leftSide?.type === 'identifier') {
-						instances[PlaceHolder.Variable].add(leftSide.text);
+						instances[Placeholder.Variable].push(locator(leftSide));
 					}
 				} else if (childNode?.type === 'identifier') {
-					instances[PlaceHolder.Variable].add(childNode.text);
+					instances[Placeholder.Variable].push(locator(childNode));
 				}
 				continue;
 			}

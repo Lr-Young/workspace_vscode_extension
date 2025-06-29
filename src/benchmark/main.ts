@@ -1,128 +1,183 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
 import * as fg from 'fast-glob';
-import { workspaceFolderCount } from '../utils';
+import * as path from 'path';
+import { fork } from 'child_process';
 
-export interface FileChunk {
-    readonly filePath: string;
-    readonly startLine: number;
-    readonly endLine: number;
-}
-
-interface Instance {
-    readonly repo: string;
-    readonly question: string;
-    readonly referrence: FileChunk[];
-    readonly answer: string;
-    readonly points: string;
-}
+import { shuffle } from '../utils';
+import { Placeholder, PlaceholderInstance, QuestionInstance, QuestionTemplate } from './typeDefinitions';
+import { parseFiles } from './languageAnalyser/parser';
 
 const excludePattern = "";
 
-/**
- * 获取工作区所有文件的内容和相对路径
- */
+const questionTemplates: QuestionTemplate[] = [
+	`Can directory ${Placeholder.Folder} be removed?`,
+	`Can file ${Placeholder.File} be remove?`,
+	`What is the meaning of directory ${Placeholder.Folder}?`,
+	`What is the meaning of file ${Placeholder.File}?`,
+	`What is the meaning of class ${Placeholder.Class}?`,
+	`What is the meaning of function ${Placeholder.Function}?`,
+	`What is the role of file ${Placeholder.File}?`,
+	`What is the role of class ${Placeholder.Class}?`,
+	`What is the role of directory ${Placeholder.Folder}?`,
+	`What is the role of variable ${Placeholder.Variable}?`,
+	`What is the implementation logic of class ${Placeholder.Class}`,
+	`What is the implementation logic of function ${Placeholder.Function}`,
+	`What is the usage of class ${Placeholder.Class}`,
+	`What is the usage of function ${Placeholder.Function}`,
+].map(str => {
+	return new QuestionTemplate(str);
+});
 
-export async function getAllFilesContent() {
+let workspacePath: string = '';
 
-    const start = performance.now();
+function instantiate(questionNum: number, placeHolderInstances: PlaceholderInstance): QuestionInstance {
+    
+	const questions: QuestionInstance = {
+        workspacePath: workspacePath,
+        instances: [],
+    };
 
-    if (vscode.workspace.workspaceFolders === undefined) {
-        vscode.window.showErrorMessage("请在工作区打开一个目录");
-        return;
-    }
+	const selectors: {
+		[key: string]: {
+			index: number,
+			instances: string[],
+		}
+	} = {};
 
-    if (workspaceFolderCount() !== 1) {
-        vscode.window.showErrorMessage("请在工作区只打开一个目录");
-    }
+	let total: number = 0;
+	Object.entries(placeHolderInstances).forEach(([key, value]) => {
+		total += value.length;
+		selectors[key] = {
+			index: 0,
+			instances: shuffle([...placeHolderInstances[key]]),
+		};
+	});
 
-    let fileCount: number = 0;
-    let fileContent: string;
-    let contentLen: number = 0;
+	if (total === 0) {
+		console.log("Error! place holder instance count is 0");
+		return questions;
+	}
 
-    const workspacePath = vscode.workspace.workspaceFolders[0].uri.fsPath;
+	let templateIndex = 0;
 
-    const files = await vscode.workspace.findFiles('**/*');
-
-    for (const fileUri of files) {
-        try {
-            const relativePath = path.relative(workspacePath, fileUri.fsPath);
-
-            fileCount += 1;
-
-            console.log(`正在处理文件: ${relativePath}`);
-
-            fileContent = await vscode.workspace.fs.readFile(fileUri)
-                .then(content => Buffer.from(content).toString('utf-8'));
-
-            contentLen += fileContent.length;
-        } catch(error) {
-            vscode.window.showErrorMessage(`读取文件失败：${fileUri.fsPath}, \n${error}`);
+	for (let i = 0; i < questionNum; i++) {
+		const template = questionTemplates[templateIndex];
+		const selector = selectors[template.placeholder];
+        let instance: string;
+        if (template.placeholder === Placeholder.File || template.placeholder === Placeholder.Folder) {
+            instance = selector.instances[selector.index];
+        } else {
+            instance = selector.instances[selector.index].split('#')[2];
         }
-    }
+        questions.instances.push({
+            question: template.instantiate(instance),
+            template: template.template,
+            placeholder: template.placeholder,
+            placeholderInstance: `${selector.instances[selector.index]}`,
+        });
+		templateIndex = (templateIndex + 1) % questionTemplates.length;
+		selector.index = (selector.index + 1) % selector.instances.length;
+	}
 
-    const end = performance.now();
-
-    console.log(`文件总数为：${fileCount}`);
-    console.log(`文件内容长度：${contentLen}`);
-    console.log(`文件平均长度: ${contentLen / fileCount}`);
-
-    vscode.window.showInformationMessage(`文件总数为：${fileCount}\n文件内容长度：${contentLen}`);
-
-    console.log(`总耗时: ${end - start} ms`);
-
-    return end - start;
-
+	return questions;
 }
 
+async function getPlaceholderInstances(webview: vscode.Webview): Promise<PlaceholderInstance> {
 
-export async function getAllFilesContentFast() {
+    let instances: PlaceholderInstance = {};
 
-    const start = performance.now();
+    Object.values(Placeholder).forEach(value => {
+        instances[value] = [];
+    });
 
-    if (vscode.workspace.workspaceFolders === undefined) {
+    instances['WorkspacePath'] = [workspacePath];
+
+    const relativePath = (filePath: string) => {
+        return path.relative(workspacePath, filePath);
+    };
+
+    const files = await fg.glob('**', {
+            cwd: workspacePath,
+            absolute: true,
+            onlyFiles: true,
+            ignore: ['**/node_modules/**'], // 忽略node_modules
+            dot: true // 包含点文件
+    });
+
+    const directories = await fg.glob('**/', {
+            cwd: workspacePath,
+            absolute: true,
+            onlyDirectories: true,
+            ignore: ['**/node_modules/**'],
+            dot: true
+    });
+
+    files.forEach(filePath => {
+        instances[Placeholder.File].push(relativePath(filePath));
+    });
+
+    directories.forEach(dirPath => {
+        instances[Placeholder.Folder].push(relativePath(dirPath));
+    });
+
+    Object.entries(((await parseFiles(files)))).forEach(([key, value]) => {
+        value.forEach(element => {
+            instances[key].push(element);
+        });
+    });
+
+
+    return instances;
+}
+
+export async function constructBenchmark(webview: vscode.Webview) {
+
+    if (vscode.workspace.workspaceFolders === undefined || vscode.workspace.workspaceFolders.length !== 1) {
         vscode.window.showErrorMessage("请在工作区打开一个目录");
+        webview.postMessage({
+            type: 'benchmark fail',
+        });
         return;
     }
 
-    if (workspaceFolderCount() !== 1) {
-        vscode.window.showErrorMessage("请在工作区只打开一个目录");
-    }
+    workspacePath = `${vscode.workspace.workspaceFolders[0].uri.fsPath}${path.sep}`;
 
-    let fileCount: number = 0;
-    let fileContent: string;
-    let contentLen: number = 0;
+    webview.postMessage({command: 'benchmark begin'});
 
-    const workspacePath = vscode.workspace.workspaceFolders[0].uri.fsPath;
+    const instances = await getPlaceholderInstances(webview);
 
-    const files = await fg.glob('**/*', {
-        absolute: true,
+    webview.postMessage({
+        command: 'benchmark instances',
+        instances: instances,
     });
 
-    for (const filePath of files) {
-        try {
-            fileCount += 1;
+    const questions = instantiate(100, instances);
 
-            console.log(`正在处理文件: ${filePath}`);
+    webview.postMessage({
+        command: 'benchmark questions',
+        questions: questions,
+    });
+    
+}
 
-            fileContent = await vscode.workspace.fs.readFile(vscode.Uri.file(filePath))
-                .then(content => Buffer.from(content).toString('utf-8'));
-
-            contentLen += fileContent.length;
-        } catch(error) {
-            vscode.window.showErrorMessage(`读取文件失败：${filePath}, \n${error}`);
-        }
+export async function handleLink(type: string, value: string) {
+    switch (type) {
+        case 'Folder':
+            await vscode.commands.executeCommand('revealInExplorer', vscode.Uri.file(value));
+            return;
+        case 'File':
+            const document = await vscode.workspace.openTextDocument(value);
+            await vscode.window.showTextDocument(document, {preview: false});
+            return;
+        case 'Position':
+            const values = value.split('#');
+            const filePath = values[0];
+            const line = parseInt(values[1]);
+            const doc = await vscode.workspace.openTextDocument(filePath);
+            const editor = await vscode.window.showTextDocument(doc, {preview: false});
+            const position = new vscode.Position(line, 0);
+            editor.selection = new vscode.Selection(position, position);
+            editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
+            return; 
     }
-
-    const end = performance.now();
-
-    console.log(`文件总数为：${fileCount}`);
-    console.log(`文件内容长度：${contentLen}`);
-    console.log(`文件平均长度: ${contentLen / fileCount}`);
-
-    vscode.window.showInformationMessage(`文件总数为：${fileCount}\n文件内容长度：${contentLen}`);
-
-    console.log(`总耗时: ${end - start} ms`);
-
-    return end - start;
 }
