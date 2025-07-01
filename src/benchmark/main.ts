@@ -4,10 +4,16 @@ import * as path from 'path';
 import { fork } from 'child_process';
 
 import { shuffle } from '../utils';
-import { Placeholder, PlaceholderInstance, QuestionInstance, QuestionTemplate } from './typeDefinitions';
+import { Placeholder, PlaceholderInstance, QuestionContext, QuestionInstance, QuestionTemplate } from './typeDefinitions';
 import { parseFiles } from './languageAnalyser/parser';
+import { LLMLogger, sleep } from '../utils';
+import { postMessage } from './benchmarkWebviewPanel';
+import { ContextAgent } from './llm';
 
-const excludePattern = "";
+const excludePattern = [
+    '**/node_modules/**',
+    '**/.*/**',
+];
 
 const questionTemplates: QuestionTemplate[] = [
 	`Can directory ${Placeholder.Folder} be removed?`,
@@ -29,13 +35,12 @@ const questionTemplates: QuestionTemplate[] = [
 });
 
 let workspacePath: string = '';
+let repoName: string = '';
+export let logger: LLMLogger;
 
-function instantiate(questionNum: number, placeHolderInstances: PlaceholderInstance): QuestionInstance {
+function instantiate(questionNum: number, placeHolderInstances: PlaceholderInstance): QuestionInstance[] {
     
-	const questions: QuestionInstance = {
-        workspacePath: workspacePath,
-        instances: [],
-    };
+	const questions: QuestionInstance[] = [];
 
 	const selectors: {
 		[key: string]: {
@@ -69,7 +74,7 @@ function instantiate(questionNum: number, placeHolderInstances: PlaceholderInsta
         } else {
             instance = selector.instances[selector.index].split('#')[2];
         }
-        questions.instances.push({
+        questions.push({
             question: template.instantiate(instance),
             template: template.template,
             placeholder: template.placeholder,
@@ -82,7 +87,7 @@ function instantiate(questionNum: number, placeHolderInstances: PlaceholderInsta
 	return questions;
 }
 
-async function getPlaceholderInstances(webview: vscode.Webview): Promise<PlaceholderInstance> {
+async function getPlaceholderInstances(): Promise<PlaceholderInstance> {
 
     let instances: PlaceholderInstance = {};
 
@@ -100,7 +105,7 @@ async function getPlaceholderInstances(webview: vscode.Webview): Promise<Placeho
             cwd: workspacePath,
             absolute: true,
             onlyFiles: true,
-            ignore: ['**/node_modules/**'], // 忽略node_modules
+            ignore: excludePattern, // 忽略node_modules
             dot: true // 包含点文件
     });
 
@@ -108,7 +113,7 @@ async function getPlaceholderInstances(webview: vscode.Webview): Promise<Placeho
             cwd: workspacePath,
             absolute: true,
             onlyDirectories: true,
-            ignore: ['**/node_modules/**'],
+            ignore: excludePattern,
             dot: true
     });
 
@@ -126,38 +131,7 @@ async function getPlaceholderInstances(webview: vscode.Webview): Promise<Placeho
         });
     });
 
-
     return instances;
-}
-
-export async function constructBenchmark(webview: vscode.Webview) {
-
-    if (vscode.workspace.workspaceFolders === undefined || vscode.workspace.workspaceFolders.length !== 1) {
-        vscode.window.showErrorMessage("请在工作区打开一个目录");
-        webview.postMessage({
-            type: 'benchmark fail',
-        });
-        return;
-    }
-
-    workspacePath = `${vscode.workspace.workspaceFolders[0].uri.fsPath}${path.sep}`;
-
-    webview.postMessage({command: 'benchmark begin'});
-
-    const instances = await getPlaceholderInstances(webview);
-
-    webview.postMessage({
-        command: 'benchmark instances',
-        instances: instances,
-    });
-
-    const questions = instantiate(100, instances);
-
-    webview.postMessage({
-        command: 'benchmark questions',
-        questions: questions,
-    });
-    
 }
 
 export async function handleLink(type: string, value: string) {
@@ -169,7 +143,7 @@ export async function handleLink(type: string, value: string) {
             const document = await vscode.workspace.openTextDocument(value);
             await vscode.window.showTextDocument(document, {preview: false});
             return;
-        case 'Position':
+        case 'Position': {
             const values = value.split('#');
             const filePath = values[0];
             const line = parseInt(values[1]);
@@ -179,5 +153,104 @@ export async function handleLink(type: string, value: string) {
             editor.selection = new vscode.Selection(position, position);
             editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
             return; 
+        }
+        case 'Range': {
+            const values = value.split('#');
+            const filePath = values[0];
+            const startLine: number = parseInt(values[1]);
+            const endLine: number = parseInt(values[2]);
+            const doc = await vscode.workspace.openTextDocument(filePath);
+            const editor = await vscode.window.showTextDocument(doc);
+            const startPos = new vscode.Position(startLine, 0);
+            const endPos = new vscode.Position(endLine, 
+                doc.lineAt(endLine).text.length);
+            editor.selection = new vscode.Selection(startPos, endPos);
+            editor.revealRange(new vscode.Range(startPos, endPos));
+        }
+            
     }
+}
+
+async function labelRelevantContext(questions: QuestionInstance[]): Promise<void> {
+
+    const agent: ContextAgent = new ContextAgent();
+
+    const files = await fg.glob('**', {
+            cwd: workspacePath,
+            absolute: true,
+            onlyFiles: true,
+            ignore: excludePattern, // 忽略node_modules
+            dot: true // 包含点文件
+    });
+
+    for (const instance of questions) {
+        postMessage({
+            command: 'benchmark context',
+            type: 'question',
+            question: instance.question,
+        });
+        for (const file of files) {
+            postMessage({
+                command: 'benchmark context',
+                type: 'analyse file',
+                file: path.relative(workspacePath, file),
+            });
+            const relativePath: string = path.join(repoName, path.relative(workspacePath, file));
+            const context: QuestionContext = await agent.invoke(instance.question, file, relativePath, repoName);
+            if (context.references.length > 0) {
+                postMessage({
+                    command: 'benchmark context',
+                    type: 'references',
+                    references: context.references,
+                    reason: context.reason,
+                    workspacePath: workspacePath,
+                });
+            }
+        }
+    }
+}
+
+export async function constructBenchmark() {
+
+    if (vscode.workspace.workspaceFolders === undefined || vscode.workspace.workspaceFolders.length !== 1) {
+        vscode.window.showErrorMessage("请在工作区打开一个目录");
+        postMessage({
+            command: 'benchmark fail',
+            type: 'workspace folder not one',
+            error: '请保证工作区只有一个打开的目录'
+        });
+        return;
+    }
+
+    workspacePath = `${vscode.workspace.workspaceFolders[0].uri.fsPath}${path.sep}`;
+    repoName = vscode.workspace.workspaceFolders[0].name;
+
+    logger = new LLMLogger(workspacePath);
+
+    postMessage({command: 'benchmark begin'});
+
+    const instances = await getPlaceholderInstances();
+    postMessage({
+        command: 'benchmark instances',
+        instances: instances,
+    });
+
+    const questions = instantiate(100, instances);
+    postMessage({
+        command: 'benchmark questions',
+        questions: questions,
+        workspacePath: workspacePath,
+    });
+
+    await labelRelevantContext(questions);
+    postMessage({
+        command: 'benchmark context',
+        type: 'done',
+    });
+
+
+    postMessage({
+        command: 'benchmark done',
+    });
+    
 }

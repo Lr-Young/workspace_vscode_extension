@@ -10,13 +10,10 @@ export enum Placeholder {
 export type PlaceholderInstance = Record<string, string[]>;
 
 export type QuestionInstance = {
-	workspacePath: string,
-	instances: Array<{
-		question: string,
-		template: string,
-		placeholder: string,
-		placeholderInstance: string,
-	}>,
+	question: string,
+	template: string,
+	placeholder: string,
+	placeholderInstance: string,
 };
 
 export function toString(data: PlaceholderInstance): string {
@@ -58,16 +55,22 @@ export class QuestionTemplate {
 	}
 }
 
-export interface FileChunk {
+export type FileChunk = {
 	readonly filePath: string;
 	readonly startLine: number;
 	readonly endLine: number;
 }
 
-export interface Instance {
+export type Instance = {
 	readonly repo: string;
 	readonly question: string;
 	readonly referrence: FileChunk[];
 	readonly answer: string;
 	readonly points: string;
+}
+
+export type QuestionContext = {
+	question: string,
+	references: FileChunk[],
+	reason: string,
 }

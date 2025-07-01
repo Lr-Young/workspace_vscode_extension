@@ -1,7 +1,15 @@
-import { Disposable, Uri, WebviewPanel, window, ViewColumn } from "vscode";
+import { Disposable, Uri, Webview, WebviewPanel, window, ViewColumn } from "vscode";
 import { getWebviewContent } from "../gui/benchmark";
 import { constructBenchmark } from "../benchmark/main";
 import { handleLink } from './main';
+
+import { testLLM } from './llm';
+
+let webview: Webview;
+
+export function postMessage(message: any) {
+	webview.postMessage(message);
+}
 
 export class BenchmarkWebviewPanel {
 
@@ -18,14 +26,20 @@ export class BenchmarkWebviewPanel {
 
 		this._webviewPanel.webview.html = getWebviewContent(this._webviewPanel.webview, extionsionUri);
 
+		webview = this._webviewPanel.webview;
+
 		this._webviewPanel.webview.onDidReceiveMessage(
-			message => {
+			async message => {
 				switch (message.command) {
 					case 'benchmarkConstruct':
-						constructBenchmark(this._webviewPanel.webview);
+						constructBenchmark();
 						return;
 					case 'link':
 						handleLink(message.type, message.value);
+						return;
+					case 'testButton':
+						const msg = await testLLM();
+						window.showInformationMessage(msg as string);
 						return;
 				}
 			}

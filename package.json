@@ -67,9 +67,13 @@
     "typescript": "^5.7.3"
   },
   "dependencies": {
+    "@langchain/community": "^0.3.47",
+    "@langchain/core": "^0.3.61",
+    "@langchain/deepseek": "^0.0.2",
     "@types/vscode-webview": "^1.57.5",
     "@vscode/webview-ui-toolkit": "^1.2.2",
     "fast-glob": "^3.3.3",
+    "langchain": "^0.3.29",
     "tree-sitter": "^0.22.4",
     "tree-sitter-python": "^0.23.6"
   }

@@ -78,15 +78,7 @@ vscode-panels {
 
 /* todo: 网格线颜色 #3C3C3C; */
 
-#placeholder-section {
-  display: none;
-}
-
-/* #placeholder-instances-grid {
-  display: none;
-} */
-
-#question-instances-grid {
+.hidden {
   display: none;
 }
 

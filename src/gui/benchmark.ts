@@ -50,6 +50,7 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
     <vscode-divider role="separator"></vscode-divider>
 
 	<div id="test"></div>
+    <vscode-button appearance="primary" id="test-constructing">Test Button</vscode-button>
 	<vscode-divider role="separator"></vscode-divider>
 
     <section class="grid-one-column">
@@ -59,17 +60,23 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
     </section>
     <vscode-divider role="separator"></vscode-divider>
 
-	<div id="placeholder-section">
+	<div class="hidden" id="placeholder-section">
 		<section class="grid-one-column">
 			<section class="component-container">
-				<div class="parent">
-					<h3 id="placeholder-instantiate-header">Placeholder Instantiating</h3>
-					<vscode-progress-ring id="benchmark-progress-ring"></vscode-progress-ring>
-				</div>
+                <vscode-checkbox readonly id="placeholder-instantiation-checkbox">Placeholder Instantiation</vscode-checkbox>
+                <vscode-progress-ring class="hidden" id="placeholder-instantiation-progress-ring"></vscode-progress-ring>
 
+                <vscode-checkbox readonly id="question-instantiation-checkbox">Question Instantiation</vscode-checkbox>
+                <vscode-progress-ring class="hidden" id="question-instantiation-progress-ring"></vscode-progress-ring>
+
+                <vscode-checkbox readonly id="label-reference-checkbox">Label Relevant Context References</vscode-checkbox>
+                <vscode-progress-ring class="hidden" id="label-reference-progress-ring"></vscode-progress-ring>
+                
                 <vscode-data-grid id="placeholder-instances-grid" grid-template-columns="1fr 1fr"></vscode-data-grid>
 
-                <vscode-data-grid id="question-instances-grid" grid-template-columns="1fr 1fr 1fr"></vscode-data-grid>
+                <vscode-data-grid class="hidden" id="question-instances-grid" grid-template-columns="1fr 1fr 1fr"></vscode-data-grid>
+
+                <vscode-data-grid class="hidden" id="question-references-grid" grid-template-columns="1fr 1fr 1fr"></vscode-data-grid>
 
 			</section>
 		</section>

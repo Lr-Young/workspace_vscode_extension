@@ -1,17 +1,18 @@
 
 export function getExtractRelevantFileSnippetPrompt(
-  question: string,
-  filePath: string,
-  fileContent: string
+	question: string,
+	filePath: string,
+	fileContent: string,
+	repoName: string,
 ): string {
-  const lines = fileContent.split('\n');
-  const numberedLines = lines.map((line, index) => {
-    return `${index + 1}: ${line}`;
-  });
-  fileContent = numberedLines.join('\n');
-  return `
+	const lines = fileContent.split('\n');
+	const numberedLines = lines.map((line, index) => {
+		return `${index + 1}: ${line}`;
+	});
+	fileContent = numberedLines.join('\n');
+	return `
 You are a code comprehension assistant.  
-Your job is to find **all** contiguous spans of code or text in a single file that are necessary to answer a given question about the code base.  
+Your job is to find **all** contiguous spans of code or text in a single file that are necessary to answer a given question about the code base named \`${repoName}\`.  
 
 —— INPUT ——
 Question:
@@ -39,18 +40,11 @@ ${fileContent.trim()}
 [Answer]
 <Here goes the JSON array.>
 
-Example valid output:
-\`\`\`json
-[
-  { "start": 3, "end": 5 }
-]
-
 ### Example
 [Analysis]  
 I see that \`functionA\` is declared on lines 12-17 and its comment above on lines 10-11 explains its purpose. I also see that \`functionA\` is called on lines 35 in \`functionB\` definition on line 30-45. There are two other function definitions in this file, but they are not relevant to the question.
 
 [Answer]
-\`\`\`json
 [
   { "start": 10, "end": 17 },
   { "start": 30, "end": 45 }
@@ -58,3 +52,30 @@ I see that \`functionA\` is declared on lines 12-17 and its comment above on lin
 `.trim();
 }
 
+export function getGenerateAnswerPrompt() {
+	return `
+You are a code comprehension assistant. You are working with a codebase named <repo>. You are required to answer a codebase comprehension question based on the provided relevant context from the codebase.
+
+You are given:
+- A developer question that requires understanding specific parts of the codebase.
+- A list of code snippets that are relevant to answering the question.
+
+—— INPUT ——
+Developer question:
+{{QUESTION}}
+
+Relevant code snippets from the codebase:
+- <{{path1}}, {{start1}}, {{end1}}>
+- <{{path2}}, {{start2}}, {{end2}}>
+...
+
+—— TASK ——
+1. Based on the information from the above relevant code snippets, write a clear and detailed answer to the developer's question.Avoid hallucination.
+2. You must synthesize the information across all the above relevant code snippets, analyzing how they relate to one another. Avoid treating each snippet in isolation.
+3. Your response should be well-structured and logically organized. If you need to explain code logic, use clear and accessible language while ensuring technical accuracy.
+
+—— RESPONSE FORMAT ——
+Answer:
+<your answer here>
+`.trim();
+}

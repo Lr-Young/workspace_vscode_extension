@@ -43,7 +43,7 @@ export class PythonCodeParser implements CodeParser {
 		instances[Placeholder.Variable] = [];
 		instances[Placeholder.Class] = [];
 
-		const content: string = await fs.readFileSync(filePath, 'utf8');
+		const content: string = fs.readFileSync(filePath, 'utf8');
 
 		const tree = this.parser.parse(content);
 

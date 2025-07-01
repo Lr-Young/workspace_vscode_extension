@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import { BenchmarkWebviewPanel } from './benchmark/benchmarkWebviewPanel';
 
+console.log(`set env: ${process.env.DEEPSEEK_API_KEY}`);
+
 export function activate(context: vscode.ExtensionContext) {
 
 	context.subscriptions.push(
