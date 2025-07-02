@@ -6,13 +6,15 @@ import { fork } from 'child_process';
 import { shuffle } from '../utils';
 import { Placeholder, PlaceholderInstance, QuestionContext, QuestionInstance, QuestionTemplate } from './typeDefinitions';
 import { parseFiles } from './languageAnalyser/parser';
-import { LLMLogger, sleep } from '../utils';
+import { LLMLogger } from '../logger';
+import { sleep } from '../utils';
 import { postMessage } from './benchmarkWebviewPanel';
 import { ContextAgent } from './llm';
 
 const excludePattern = [
     '**/node_modules/**',
     '**/.*/**',
+    '**/.*',
 ];
 
 const questionTemplates: QuestionTemplate[] = [
@@ -37,6 +39,90 @@ const questionTemplates: QuestionTemplate[] = [
 let workspacePath: string = '';
 let repoName: string = '';
 export let logger: LLMLogger;
+
+export async function handleLink(type: string, value: string) {
+    switch (type) {
+        case 'Folder':
+            await vscode.commands.executeCommand('revealInExplorer', vscode.Uri.file(value));
+            return;
+        case 'File':
+            const document = await vscode.workspace.openTextDocument(value);
+            await vscode.window.showTextDocument(document, {preview: false});
+            return;
+        case 'Position': {
+            const values = value.split('#');
+            const filePath = values[0];
+            const line = parseInt(values[1]);
+            const doc = await vscode.workspace.openTextDocument(filePath);
+            const editor = await vscode.window.showTextDocument(doc, {preview: false});
+            const position = new vscode.Position(line, 0);
+            editor.selection = new vscode.Selection(position, position);
+            editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
+            return; 
+        }
+        case 'Range': {
+            const values = value.split('#');
+            const filePath = values[0];
+            const startLine: number = parseInt(values[1]);
+            const endLine: number = parseInt(values[2]);
+            const doc = await vscode.workspace.openTextDocument(filePath);
+            const editor = await vscode.window.showTextDocument(doc);
+            const startPos = new vscode.Position(startLine, 0);
+            const endPos = new vscode.Position(endLine, 
+                doc.lineAt(endLine).text.length);
+            editor.selection = new vscode.Selection(startPos, endPos);
+            editor.revealRange(new vscode.Range(startPos, endPos));
+        }
+            
+    }
+}
+
+async function getPlaceholderInstances(): Promise<PlaceholderInstance> {
+
+    let instances: PlaceholderInstance = {};
+
+    Object.values(Placeholder).forEach(value => {
+        instances[value] = [];
+    });
+
+    instances['WorkspacePath'] = [workspacePath];
+
+    const relativePath = (filePath: string) => {
+        return path.relative(workspacePath, filePath);
+    };
+
+    const files = await fg.glob('**', {
+            cwd: workspacePath,
+            absolute: true,
+            onlyFiles: true,
+            ignore: excludePattern, // 忽略node_modules
+            dot: true // 包含点文件
+    });
+
+    const directories = await fg.glob('**/', {
+            cwd: workspacePath,
+            absolute: true,
+            onlyDirectories: true,
+            ignore: excludePattern,
+            dot: true
+    });
+
+    files.forEach(filePath => {
+        instances[Placeholder.File].push(relativePath(filePath));
+    });
+
+    directories.forEach(dirPath => {
+        instances[Placeholder.Folder].push(relativePath(dirPath));
+    });
+
+    Object.entries(((await parseFiles(files)))).forEach(([key, value]) => {
+        value.forEach(element => {
+            instances[key].push(element);
+        });
+    });
+
+    return instances;
+}
 
 function instantiate(questionNum: number, placeHolderInstances: PlaceholderInstance): QuestionInstance[] {
     
@@ -87,90 +173,6 @@ function instantiate(questionNum: number, placeHolderInstances: PlaceholderInsta
 	return questions;
 }
 
-async function getPlaceholderInstances(): Promise<PlaceholderInstance> {
-
-    let instances: PlaceholderInstance = {};
-
-    Object.values(Placeholder).forEach(value => {
-        instances[value] = [];
-    });
-
-    instances['WorkspacePath'] = [workspacePath];
-
-    const relativePath = (filePath: string) => {
-        return path.relative(workspacePath, filePath);
-    };
-
-    const files = await fg.glob('**', {
-            cwd: workspacePath,
-            absolute: true,
-            onlyFiles: true,
-            ignore: excludePattern, // 忽略node_modules
-            dot: true // 包含点文件
-    });
-
-    const directories = await fg.glob('**/', {
-            cwd: workspacePath,
-            absolute: true,
-            onlyDirectories: true,
-            ignore: excludePattern,
-            dot: true
-    });
-
-    files.forEach(filePath => {
-        instances[Placeholder.File].push(relativePath(filePath));
-    });
-
-    directories.forEach(dirPath => {
-        instances[Placeholder.Folder].push(relativePath(dirPath));
-    });
-
-    Object.entries(((await parseFiles(files)))).forEach(([key, value]) => {
-        value.forEach(element => {
-            instances[key].push(element);
-        });
-    });
-
-    return instances;
-}
-
-export async function handleLink(type: string, value: string) {
-    switch (type) {
-        case 'Folder':
-            await vscode.commands.executeCommand('revealInExplorer', vscode.Uri.file(value));
-            return;
-        case 'File':
-            const document = await vscode.workspace.openTextDocument(value);
-            await vscode.window.showTextDocument(document, {preview: false});
-            return;
-        case 'Position': {
-            const values = value.split('#');
-            const filePath = values[0];
-            const line = parseInt(values[1]);
-            const doc = await vscode.workspace.openTextDocument(filePath);
-            const editor = await vscode.window.showTextDocument(doc, {preview: false});
-            const position = new vscode.Position(line, 0);
-            editor.selection = new vscode.Selection(position, position);
-            editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
-            return; 
-        }
-        case 'Range': {
-            const values = value.split('#');
-            const filePath = values[0];
-            const startLine: number = parseInt(values[1]);
-            const endLine: number = parseInt(values[2]);
-            const doc = await vscode.workspace.openTextDocument(filePath);
-            const editor = await vscode.window.showTextDocument(doc);
-            const startPos = new vscode.Position(startLine, 0);
-            const endPos = new vscode.Position(endLine, 
-                doc.lineAt(endLine).text.length);
-            editor.selection = new vscode.Selection(startPos, endPos);
-            editor.revealRange(new vscode.Range(startPos, endPos));
-        }
-            
-    }
-}
-
 async function labelRelevantContext(questions: QuestionInstance[]): Promise<void> {
 
     const agent: ContextAgent = new ContextAgent();
@@ -196,14 +198,15 @@ async function labelRelevantContext(questions: QuestionInstance[]): Promise<void
                 file: path.relative(workspacePath, file),
             });
             const relativePath: string = path.join(repoName, path.relative(workspacePath, file));
-            const context: QuestionContext = await agent.invoke(instance.question, file, relativePath, repoName);
+            const context: QuestionContext = await agent.mockInvoke(instance.question, file, relativePath, repoName);
+            await sleep(2000);
             if (context.references.length > 0) {
                 postMessage({
                     command: 'benchmark context',
                     type: 'references',
                     references: context.references,
                     reason: context.reason,
-                    workspacePath: workspacePath,
+                    relativePath: relativePath,
                 });
             }
         }
@@ -235,7 +238,7 @@ export async function constructBenchmark() {
         instances: instances,
     });
 
-    const questions = instantiate(100, instances);
+    const questions = instantiate(10, instances);
     postMessage({
         command: 'benchmark questions',
         questions: questions,

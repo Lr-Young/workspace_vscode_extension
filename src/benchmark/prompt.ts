@@ -7,22 +7,28 @@ export function getExtractRelevantFileSnippetPrompt(
 ): string {
 	const lines = fileContent.split('\n');
 	const numberedLines = lines.map((line, index) => {
-		return `${index + 1}: ${line}`;
+		return `${index}: ${line}`;
 	});
 	fileContent = numberedLines.join('\n');
 	return `
-You are a code comprehension assistant.  
-Your job is to find **all** contiguous spans of code or text in a single file that are necessary to answer a given question about the code base named \`${repoName}\`.  
+You are an experienced code comprehension expert.  
+Your job is to find **all** contiguous spans of code or text in a single file that are necessary to answer a code comprehension question about the code base named \`${repoName}\`.  
 
 —— INPUT ——
-Question:
+Code Comprehension Question:
+<question>
 ${question.trim()}”
+</question>
 
-File path:
+File Path:
+<file-path>
 “${filePath.trim()}”
+</file-path>
 
-File content (with line numbers):
+File Content (with line numbers):
+<file-content>
 ${fileContent.trim()}
+</file-content>
 
 —— INSTRUCTIONS ——
 1. Read the **Question** carefully; identify its key target(s) (e.g. function, variable, module identifiers etc.).  
@@ -52,30 +58,81 @@ I see that \`functionA\` is declared on lines 12-17 and its comment above on lin
 `.trim();
 }
 
-export function getGenerateAnswerPrompt() {
+export function getGenerateAnswerPrompt(
+	question: string,
+	repoName: string,
+	references: {
+		relativePath: string,
+		content: string,
+		language: string,
+	}[],
+) {
 	return `
-You are a code comprehension assistant. You are working with a codebase named <repo>. You are required to answer a codebase comprehension question based on the provided relevant context from the codebase.
+You are an experienced code comprehension expert. You are working with a codebase named ${repoName}. You are required to answer a codebase comprehension question based on the provided relevant context from the codebase.
 
 You are given:
-- A developer question that requires understanding specific parts of the codebase.
+- A codebase comprehension question that requires understanding specific parts of the codebase.
 - A list of code snippets that are relevant to answering the question.
 
 —— INPUT ——
-Developer question:
-{{QUESTION}}
+Codebase Comprehension Question:
+<question>
+${question}
+</question>
 
-Relevant code snippets from the codebase:
-- <{{path1}}, {{start1}}, {{end1}}>
-- <{{path2}}, {{start2}}, {{end2}}>
-...
+Relevant Code Snippets From The Codebase:
+${references.map(reference => {
+	return `**File Path**: ${reference.relativePath}\n\`\`\`${reference.language}\n${reference.content.trim()}\n\`\`\`\n`;
+}).join('\n')}
+
 
 —— TASK ——
-1. Based on the information from the above relevant code snippets, write a clear and detailed answer to the developer's question.Avoid hallucination.
+1. Based on the information from the above relevant code snippets, write a clear and detailed answer to the codebase comprehension question. Avoid hallucination.
 2. You must synthesize the information across all the above relevant code snippets, analyzing how they relate to one another. Avoid treating each snippet in isolation.
 3. Your response should be well-structured and logically organized. If you need to explain code logic, use clear and accessible language while ensuring technical accuracy.
 
 —— RESPONSE FORMAT ——
 Answer:
 <your answer here>
+`.trim();
+}
+
+export function getGeneratePointsPrompt(
+	question: string,
+	answer: string,
+) {
+
+	return `
+You are an experienced coder and technical documentation specialist.
+Your job is to transform a codebase comprehension question' answer into standardized evaluation frameworks containing quantifiable scoring dimensions for automated assessment of other LLM's answer on the codebase comprehension question.
+
+You are given:
+- A codebase comprehension question.
+- Standard Answer to the codebase comprehension question.
+
+—— INPUT ——
+Codebase comprehension question:
+<question>
+${question}
+</question>
+Standard answer to the codebase comprehension question:
+<answer>
+${answer}
+</answer>
+
+—— OUTPUT REQUIREMENTS ——
+1. **Independence**: Each dimension must represent atomic technical elements
+2. **Readability**: Each dimension description must be a Complete Setence, not Noun Phrase
+3. **Priority**: Ordered by descending technical criticality
+4. **Quantification**: Total score is strictly 10 points
+5. **Verifiability**: Each dimension must map to specific standard answer content
+
+—— Output Format ——
+Evaluation Dimensions (Total: 10 points):
+1. [Technical element 1 description] (x1 points): [Exact canonical answer excerpt]
+2. [Technical element 2 description] (x2 points): [Exact canonical answer excerpt]
+3. [Technical element 3 description] (x3 points): [Exact canonical answer excerpt](if exist)
+4. [Technical element 4 description] (x4 points): [Exact canonical answer excerpt](if exist)
+...
 `.trim();
 }

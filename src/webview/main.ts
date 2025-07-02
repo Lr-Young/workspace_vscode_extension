@@ -9,7 +9,6 @@ import {
 import { dataLoaders } from "../gui/components";
 import { FileChunk, Placeholder, PlaceholderInstance, QuestionInstance } from "../benchmark/typeDefinitions";
 import { sleep } from '../utils';
-import { relative } from "path";
 
 const vscode = acquireVsCodeApi();
 let contextGridRowIndex: number = -1;
@@ -70,7 +69,7 @@ async function appendGridCell(id: string, rowIndex: number, columnIndex: number,
 	}
 	
 	const cell = cells[columnIndex];
-	const newContent = `${cell.innerHTML}\n${content}`;
+	const newContent = `${cell.innerHTML}<br>${content}`;
 	cell.replaceChildren();
 	cell.insertAdjacentHTML('beforeend', newContent);
 	return;
@@ -153,7 +152,6 @@ function init() {
 			await sleep(200);
 		} while (document.querySelectorAll(`vscode-link.${clazz}`).length !== expectedCount);
 		document.querySelectorAll(`vscode-link.${clazz}`).forEach(link => {
-			console.log(`		${link}`);
 			link.addEventListener('click', () => {
 				vscode.postMessage({
 					command: 'link',
@@ -249,7 +247,6 @@ function init() {
 				}));
 
 				addLinkEventListener('question-data-link', expectedVscodeLinkCount);
-				(document.getElementById('placeholder-instantiation-header') as HTMLElement).textContent = 'Placeholder Instantiation and Question Instantiation Done, Labeling relevant context references... ';
 				(document.getElementById('question-instances-grid') as HTMLElement).style.display = 'block';
 				(document.getElementById('question-references-grid') as HTMLElement).style.display = 'block';
 				break;
@@ -268,12 +265,13 @@ function init() {
 						appendGridCell('question-references-grid', contextGridRowIndex, 1, 
 							(message.references as FileChunk[]).map(fileChunk => {
 								contextGridRowVscodeLinkCount += 1;
-								return `<vscode-link class="question-context-link-${contextGridRowIndex}" data-type="Range" data-value="${fileChunk.filePath}#${fileChunk.startLine}#${fileChunk.endLine}">${relative(message.workspacePath, fileChunk.filePath)}:${fileChunk.startLine}~${fileChunk.endLine}</vscode-link>`;
-							}).join('\n').trim()
+								return `<vscode-link class="question-context-link-${contextGridRowIndex}" data-type="Range" data-value="${fileChunk.filePath}#${fileChunk.startLine}#${fileChunk.endLine}">${message.relativePath}:${fileChunk.startLine}~${fileChunk.endLine}</vscode-link>`;
+							}).join('<br>').trim()
 						);
 						appendGridCell('question-references-grid', contextGridRowIndex, 2, 
-							`${relative(message.workspacePath, message.references[0].filePath)}:\n${message.reason}`
+							`<vscode-link class="question-context-link-${contextGridRowIndex}" data-type="File" data-value="${(message.references as FileChunk[])[0].filePath}">${message.relativePath}</vscode-link> Reason:<br>${message.reason}`
 						);
+						contextGridRowVscodeLinkCount += 1;
 						addLinkEventListener(`question-context-link-${contextGridRowIndex}`, contextGridRowVscodeLinkCount);
 						break;
 					}

@@ -76,7 +76,7 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
 
                 <vscode-data-grid class="hidden" id="question-instances-grid" grid-template-columns="1fr 1fr 1fr"></vscode-data-grid>
 
-                <vscode-data-grid class="hidden" id="question-references-grid" grid-template-columns="1fr 1fr 1fr"></vscode-data-grid>
+                <vscode-data-grid class="hidden" id="question-references-grid" grid-template-columns="1fr 1fr 2fr"></vscode-data-grid>
 
 			</section>
 		</section>
