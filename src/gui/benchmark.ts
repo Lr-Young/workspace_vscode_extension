@@ -53,28 +53,114 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
     <vscode-button appearance="primary" id="test-constructing">Test Button</vscode-button>
 	<vscode-divider role="separator"></vscode-divider>
 
-    <section class="grid-one-column">
-        <section class="component-example">
-            <vscode-button appearance="primary" id="button-benchmark-constructing">Begin Constructing Benchmark</vscode-button>
-        </section>
+    <div class="horizontal">
+        <p>Choose Question Instances JSON File</p>
+        <input type="file" id="question-instances-file-input" accept=".json"/>
+        <vscode-button appearance="primary" id="button-instantiate-questions-file">Load Question Instances from a JSON File</vscode-button>
+    </div>
+
+    <vscode-divider role="separator"></vscode-divider>
+
+    <section class="component-container">
+
+        <h2>Step 1: Placeholder and Question Instantiation</h2>
+
+        <div class="horizontal progress">
+            <vscode-checkbox readonly id="placeholder-instantiation-checkbox">Placeholder And Question Instantiation</vscode-checkbox>
+            <div class="progress-container hidden" id="placeholder-instantiation-progress-wrapper">
+                <div class="progress-bar" id="placeholder-instantiation-progress-bar">0%</div>
+            </div>
+        </div>
+
+        <div class="horizontal">
+            <p>Number of Questions to Instantiate</p>
+            <vscode-text-field type="number" min="1" value="10" id="instantiate-questions-number"></vscode-text-field>
+            <vscode-button appearance="primary" id="button-instantiate-questions">Instantiate Questions</vscode-button>
+        </div>
+
+        <vscode-data-grid class="hidden" id="placeholder-instances-grid" grid-template-columns="1fr 1fr"></vscode-data-grid>
+
+        <vscode-data-grid class="hidden" id="question-instances-grid" grid-template-columns="1fr 1fr 1fr"></vscode-data-grid>
+
     </section>
+
+    <vscode-divider role="separator"></vscode-divider>
+
+    <section class="component-container">
+        <h2>Step 2: Label Question Context Instantiation</h2>
+
+        <vscode-checkbox readonly id="reference-checkbox">Label Question References</vscode-checkbox>
+        <div class="progress-container hidden" id="reference-progress-wrapper">
+            <div class="progress-bar" id="reference-progress-bar">0%</div>
+        </div>
+
+        <vscode-button disabled title="Please Finish Step 1" appearance="primary" id="button-label-reference">Label References</vscode-button>
+        
+        <vscode-data-grid class="hidden" id="question-references-grid" grid-template-columns="1fr 1fr 2fr"></vscode-data-grid>
+
+    </section>
+
+    <vscode-divider role="separator"></vscode-divider>
+
+    <section class="component-container">
+        <h2>Step 3: Generate Answer And Points</h2>
+
+        <div class="horizontal progress">
+            <vscode-checkbox readonly id="answer-point-checkbox">Generate Answer And Points</vscode-checkbox>
+            <div class="progress-container hidden" id="answer-point-progress-wrapper">
+                <div class="progress-bar" id="answer-point-progress-bar">0%</div>
+            </div>
+        </div>
+
+        <vscode-button disabled title="Please Finish Step 2" appearance="primary" id="button-generate-answer-points">genreate Answer and Points</vscode-button>
+        
+        <vscode-data-grid class="hidden" id="answer-point-grid" grid-template-columns="1fr 1fr 2fr"></vscode-data-grid>
+
+    </section>
+
+    <vscode-divider role="separator"></vscode-divider>
+
+    <section class="component-container">
+        <section class="">
+            <h2>Step 1: Placeholder and Question Instantiation</h2>
+
+            <div class="horizontal progress">
+                <vscode-checkbox readonly id="placeholder-instantiation-checkbox">Placeholder And Question Instantiation</vscode-checkbox>
+                <div class="progress-container hidden" id="placeholder-instantiation-progress-wrapper">
+                    <div class="progress-bar" id="placeholder-instantiation-progress-bar">0%</div>
+                </div>
+            </div>
+
+            <div class="horizontal evenly">
+                <div class="group">
+                    <p>Number of Questions to Instantiate</p>
+                    <vscode-text-field type="number" min="1" value="10" id="instantiate-questions-number"></vscode-text-field>
+                    <vscode-button appearance="primary" id="button-instantiate-questions">Instantiate Questions</vscode-button>
+                </div>
+                
+                <div class="group">
+                    <p>Choose Question Instances JSON File</p>
+                    <input type="file" id="question-instances-file-input" accept=".json"/>
+                    <vscode-button appearance="primary" id="button-instantiate-questions-file">Load Question Instances from a JSON File</vscode-button>
+                </div>
+            </div>
+
+        </section>
+
+    </section>
+
+    <vscode-divider role="separator"></vscode-divider>
+
     <vscode-divider role="separator"></vscode-divider>
 
 	<div class="hidden" id="placeholder-section">
 		<section class="grid-one-column">
 			<section class="component-container">
-                <vscode-checkbox readonly id="placeholder-instantiation-checkbox">Placeholder Instantiation</vscode-checkbox>
-                <vscode-progress-ring class="hidden" id="placeholder-instantiation-progress-ring"></vscode-progress-ring>
-
                 <vscode-checkbox readonly id="question-instantiation-checkbox">Question Instantiation</vscode-checkbox>
                 <vscode-progress-ring class="hidden" id="question-instantiation-progress-ring"></vscode-progress-ring>
 
                 <vscode-checkbox readonly id="label-reference-checkbox">Label Relevant Context References</vscode-checkbox>
                 <vscode-progress-ring class="hidden" id="label-reference-progress-ring"></vscode-progress-ring>
-                
-                <vscode-data-grid id="placeholder-instances-grid" grid-template-columns="1fr 1fr"></vscode-data-grid>
-
-                <vscode-data-grid class="hidden" id="question-instances-grid" grid-template-columns="1fr 1fr 1fr"></vscode-data-grid>
 
                 <vscode-data-grid class="hidden" id="question-references-grid" grid-template-columns="1fr 1fr 2fr"></vscode-data-grid>
 

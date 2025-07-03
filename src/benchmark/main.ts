@@ -1,15 +1,14 @@
 import * as vscode from 'vscode';
 import * as fg from 'fast-glob';
 import * as path from 'path';
-import { fork } from 'child_process';
 
 import { shuffle } from '../utils';
-import { Placeholder, PlaceholderInstance, QuestionContext, QuestionInstance, QuestionTemplate } from './typeDefinitions';
+import { FileChunk, Placeholder, PlaceholderInstance, PlaceholderInstanceToString, QuestionContext, QuestionInstance, QuestionTemplate, supportedLanguages } from './typeDefinitions';
 import { parseFiles } from './languageAnalyser/parser';
 import { LLMLogger } from '../logger';
 import { sleep } from '../utils';
 import { postMessage } from './benchmarkWebviewPanel';
-import { ContextAgent } from './llm';
+import { AnswerAgent, ContextAgent, PointsAgent } from './llm';
 
 const excludePattern = [
     '**/node_modules/**',
@@ -39,6 +38,25 @@ const questionTemplates: QuestionTemplate[] = [
 let workspacePath: string = '';
 let repoName: string = '';
 export let logger: LLMLogger;
+
+function checkWorkspaceFolder(): boolean {
+    if (vscode.workspace.workspaceFolders === undefined || vscode.workspace.workspaceFolders.length !== 1) {
+        vscode.window.showErrorMessage("请在工作区打开一个目录");
+        postMessage({
+            command: 'benchmark fail',
+            type: 'workspace folder not one',
+            error: '请保证工作区只有一个打开的目录'
+        });
+        return false;
+    }
+
+    workspacePath = `${vscode.workspace.workspaceFolders[0].uri.fsPath}${path.sep}`;
+    repoName = vscode.workspace.workspaceFolders[0].name;
+
+    logger = new LLMLogger(workspacePath);
+
+    return true;
+}
 
 export async function handleLink(type: string, value: string) {
     switch (type) {
@@ -91,12 +109,16 @@ async function getPlaceholderInstances(): Promise<PlaceholderInstance> {
         return path.relative(workspacePath, filePath);
     };
 
-    const files = await fg.glob('**', {
+    const files = await fg.glob(
+        supportedLanguages.map(ext => {
+            return `**/*.${ext}`;
+        }), 
+        {
             cwd: workspacePath,
             absolute: true,
             onlyFiles: true,
             ignore: excludePattern, // 忽略node_modules
-            dot: true // 包含点文件
+            dot: true, // 包含点文件
     });
 
     const directories = await fg.glob('**/', {
@@ -151,21 +173,25 @@ function instantiate(questionNum: number, placeHolderInstances: PlaceholderInsta
 
 	let templateIndex = 0;
 
-	for (let i = 0; i < questionNum; i++) {
+	while (questions.length < questionNum) {
 		const template = questionTemplates[templateIndex];
 		const selector = selectors[template.placeholder];
-        let instance: string;
-        if (template.placeholder === Placeholder.File || template.placeholder === Placeholder.Folder) {
-            instance = selector.instances[selector.index];
+        if (selector.instances.length === 0) {
+            console.log(`Warning: No instances for Placeholder ${template.placeholder} `);
         } else {
-            instance = selector.instances[selector.index].split('#')[2];
+            let instance: string;
+            if (template.placeholder === Placeholder.File || template.placeholder === Placeholder.Folder) {
+                instance = selector.instances[selector.index];
+            } else {
+                instance = selector.instances[selector.index].split('#')[2];
+            }
+            questions.push({
+                question: template.instantiate(instance),
+                template: template.template,
+                placeholder: template.placeholder,
+                placeholderInstance: `${selector.instances[selector.index]}`,
+            });
         }
-        questions.push({
-            question: template.instantiate(instance),
-            template: template.template,
-            placeholder: template.placeholder,
-            placeholderInstance: `${selector.instances[selector.index]}`,
-        });
 		templateIndex = (templateIndex + 1) % questionTemplates.length;
 		selector.index = (selector.index + 1) % selector.instances.length;
 	}
@@ -173,7 +199,35 @@ function instantiate(questionNum: number, placeHolderInstances: PlaceholderInsta
 	return questions;
 }
 
-async function labelRelevantContext(questions: QuestionInstance[]): Promise<void> {
+export async function instantiateQuestions(questionNum: number) {
+
+    if (!checkWorkspaceFolder()) {
+        return;
+    }
+
+    postMessage({command: 'instantiate questions begin'});
+
+    const instances = await getPlaceholderInstances();
+
+    postMessage({
+        command: 'instantiate questions placeholder instances',
+        instances: instances,
+    });
+
+    const questions = instantiate(questionNum, instances);
+
+    postMessage({
+        command: 'instantiate questions question instances',
+        questions: questions,
+        workspacePath: workspacePath,
+    });
+}
+
+export async function labelRelevantContext(questions: string[]): Promise<void> {
+
+    if (!checkWorkspaceFolder()) {
+        return;
+    }
 
     const agent: ContextAgent = new ContextAgent();
 
@@ -185,32 +239,90 @@ async function labelRelevantContext(questions: QuestionInstance[]): Promise<void
             dot: true // 包含点文件
     });
 
-    for (const instance of questions) {
+    postMessage({
+        command: 'benchmark references',
+        type: 'init',
+        questions: questions,
+    });
+
+    for (const question of questions) {
         postMessage({
-            command: 'benchmark context',
+            command: 'benchmark references',
             type: 'question',
-            question: instance.question,
+            question: question,
         });
+        let count: number = 0;
         for (const file of files) {
+            count += 1;
             postMessage({
-                command: 'benchmark context',
+                command: 'benchmark references',
                 type: 'analyse file',
-                file: path.relative(workspacePath, file),
+                question: question,
+                file: file,
+                relativePath: path.relative(workspacePath, file),
             });
             const relativePath: string = path.join(repoName, path.relative(workspacePath, file));
-            const context: QuestionContext = await agent.mockInvoke(instance.question, file, relativePath, repoName);
+            const context: QuestionContext = await agent.mockInvoke(question, file, relativePath, repoName);
             await sleep(2000);
             if (context.references.length > 0) {
                 postMessage({
-                    command: 'benchmark context',
+                    command: 'benchmark references',
                     type: 'references',
                     references: context.references,
                     reason: context.reason,
                     relativePath: relativePath,
+                    percent: (count / files.length * 100).toFixed(2),
                 });
             }
         }
     }
+    postMessage({
+        command: 'benchmark references',
+        type: 'done',
+    });
+}
+
+export async function generateAnswerAndPoints(data: Record<string, string>[]): Promise<void> {
+
+    if (!checkWorkspaceFolder()) {
+        return;
+    }
+
+    const pattern = /^<vscode-link[^>]*>([^:]*):(\d+)~(\d+)<\/vscode-link>$/;
+
+    const questions: string[] = [];
+    const references: FileChunk[][] = [];
+
+    data.forEach(element => {
+        questions.push(element['Question']);
+        const reference: FileChunk[] = [];
+        element['Reference'].split('<br>').map(link => {
+            const match = link.match(pattern);
+            if (match) {
+                if (match[1].startsWith(repoName)) {
+                    reference.push({
+                        filePath: path.join(path.dirname(workspacePath), match[1]),
+                        startLine: parseInt(match[2]),
+                        endLine: parseInt(match[3]),
+                    });
+                } else {
+                    reference.push({
+                        filePath: path.join(workspacePath, match[1]),
+                        startLine: parseInt(match[2]),
+                        endLine: parseInt(match[3]),
+                    });
+                }
+            }
+        });
+        references.push(reference);
+    });
+
+    const answerAgent: AnswerAgent = new AnswerAgent();
+    
+    const pointsAgent: PointsAgent = new PointsAgent();
+
+
+
 }
 
 export async function constructBenchmark() {
@@ -245,15 +357,15 @@ export async function constructBenchmark() {
         workspacePath: workspacePath,
     });
 
-    await labelRelevantContext(questions);
-    postMessage({
-        command: 'benchmark context',
-        type: 'done',
-    });
+    // await labelRelevantContext(questions);
+    // postMessage({
+    //     command: 'benchmark context',
+    //     type: 'done',
+    // });
 
 
-    postMessage({
-        command: 'benchmark done',
-    });
+    // postMessage({
+    //     command: 'benchmark done',
+    // });
     
 }

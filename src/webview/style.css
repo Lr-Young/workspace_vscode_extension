@@ -55,6 +55,11 @@ margin: all-sides;
   margin: 0.25rem 0;
 }
 
+.component-container > .progress {
+  width: 100%;
+  margin: 0.25rem 0;
+}
+
 .component-example {
   margin-bottom: 0.5rem;
   width: 100%;
@@ -82,11 +87,82 @@ vscode-panels {
   display: none;
 }
 
-.parent {
-  display: flex;      /* 启用 Flexbox 布局 */
-  gap: 10px;          /* 子元素间距（可选） */
+.horizontal {
+  display: flex;
+  align-items: center; /* 垂直居中对齐 */
+  gap: 20px;            /* 元素之间的间距 */
+  flex-wrap: nowrap;    /* 避免元素换行（可根据需要换成 wrap） */
+}
+
+.horizontal .label {
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  height: 32px; /* 设置与其它组件一致高度 */
+}
+
+.horizontal vscode-text-field,
+.horizontal input[type="file"],
+.horizontal vscode-button {
+  height: 32px;
+  box-sizing: border-box;
+}
+
+/* 第一组：30% + 70% */
+.horizontal.progress > :first-child {
+  flex: 3;
+  min-width: 0;
+}
+
+.horizontal.progress > :nth-child(2) {
+  flex: 7;
+  min-width: 0;
+}
+
+.horizontal.evenly > .group {
+  flex: 1 1 50%;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-width: 0;
+}
+
+.horizontal.evenly > .group > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.vertical {
+  display: flex;
+  flex-direction: column; /* 垂直排列子元素 */
+  width: 50%;
 }
 
 .test-p {
   white-space: pre-line;
+}
+
+.progress-container {
+    width: 100%;
+    background-color: var(--vscode-editorWidget-background);
+    border-radius: 3px;
+    margin: 10px 0;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 30px;
+    background-color: var(--vscode-progressBar-background);
+    width: 0%;
+    transition: width 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 5px;
+    color: white;
+    font-size: 12px;
+    font-family: var(--vscode-font-family);
 }

@@ -16,7 +16,7 @@ export type QuestionInstance = {
 	placeholderInstance: string,
 };
 
-export function toString(data: PlaceholderInstance): string {
+export function PlaceholderInstanceToString(data: PlaceholderInstance): string {
 	const indent = '    ';
 	let ret = `{\n${indent}`;
 	Object.entries(data).forEach(([key, value]) => {
@@ -74,6 +74,19 @@ export type QuestionContext = {
 	references: FileChunk[],
 	reason: string,
 }
+
+export const supportedLanguages: string[] = [
+    'js',
+    'ts',
+    'jsx',
+    'tsx',
+    'py',
+    'java',
+    'c',
+    'h',
+    'cpp',
+    'hpp',
+];
 
 const extensionToLanguageMap: Record<string, string> = {
   // 常见编程语言

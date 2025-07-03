@@ -5,6 +5,9 @@ import * as path from 'path';
 
 import Parser = require('tree-sitter');
 
+import { postMessage } from '../benchmarkWebviewPanel';
+import { sleep } from '../../utils';
+
 const extToParser: Record<string, CodeParser> = {};
 
 export enum Language {
@@ -41,20 +44,34 @@ export async function parseFiles(files: string[]): Promise<PlaceholderInstance> 
 		instances[value] = [];
 	});
 
+	let count = 0;
+
 	for (const filePath of files) {
 		const ext = path.extname(filePath);
+		count += 1;
 		switch (ext) {
-			case '.py':
+			case '.py': {
 				if (extToParser[ext] === undefined) {
 					extToParser[ext] = new PythonCodeParser();
 				}
 				const placeHolders = await extToParser['.py'].parsePlaceHolderInstances(filePath);
+				postMessage({
+					command: 'instantiate questions processs',
+					percent: (count / files.length * 100).toFixed(2),
+				});
 				Object.entries(placeHolders).forEach(([key, value]) => {
 					value.forEach(element => {
 						instances[key].push(element);
 					});
 				});
 				break;
+			}
+			default: {
+				postMessage({
+					command: 'instantiate questions processs',
+					percent: count / files.length * 100,
+				});
+			}
 		}
 	}
 

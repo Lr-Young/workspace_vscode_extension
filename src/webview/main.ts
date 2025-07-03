@@ -111,6 +111,42 @@ async function fillGrid(id: string, data: Record<string, string>[]): Promise<voi
 	}
 }
 
+async function loadDataFromGrid(id: string): Promise<Record<string, string>[]> {
+	const data: Record<string, string>[] = [];
+
+	const grid = document.getElementById(id) as DataGrid;
+
+	const headerRow = grid.querySelectorAll('vscode-data-grid-row[row-type="header"]');
+
+	const rows = grid.querySelectorAll('vscode-data-grid-row[row-type="default"]');
+
+	if (headerRow.length !== 1) {
+		console.error(`Error when loading data from grid: no header row found`);
+		return data;
+	}
+
+	if (rows.length === 0) {
+		console.error(`Error when loading data from grid: no data rows found`);
+		return data;
+	}
+
+	const titles: string[] = Array.from(headerRow[0].children).map(cell => {
+		return cell.textContent!.trim();
+	});
+
+	for (let i = 0; i < rows.length; i++) {
+		const row = rows[i];
+		const cells = row.querySelectorAll('vscode-data-grid-cell');
+		const rowData: Record<string, string> = {};
+		for (let j = 0; j < cells.length; j++) {
+			rowData[titles[j]] = cells[j].innerHTML;
+		}
+		data.push(rowData);
+	}
+
+	return data;
+}
+
 function loadData(): void {
 	for (const [id, dataLoader] of Object.entries(dataLoaders)) {
 		const element = document.getElementById(id);
@@ -134,10 +170,36 @@ function init() {
 
 	loadData();
 
-	// benchmark constructing button
-	(document.getElementById("button-benchmark-constructing") as Button).onclick = (event) => {
+	(document.getElementById("button-instantiate-questions") as Button).onclick = (event) => {
+		(document.getElementById("button-instantiate-questions") as Button).disabled = true;
+		(document.getElementById("button-instantiate-questions") as Button).title = 'In Process...';
+		const questionNum: number = parseInt((document.getElementById('instantiate-questions-number') as HTMLInputElement).value.trim() || '10');
 		vscode.postMessage({
-			command: "benchmarkConstruct",
+			command: "instantiate questions",
+			questionNum: questionNum,
+		});
+	};
+
+	(document.getElementById("button-label-reference") as Button).onclick = async (event) => {
+		(document.getElementById("button-label-reference") as Button).disabled = true;
+		(document.getElementById("button-label-reference") as Button).title = 'In Process...';
+		const data: Record<string, string>[] = await loadDataFromGrid('question-instances-grid');
+		const questions: string[] = data.map(element => {
+			return element['Question'];
+		});
+		vscode.postMessage({
+			command: "label references",
+			questions: questions,
+		});
+	};
+
+	(document.getElementById('button-generate-answer-points') as Button).onclick = async (event) => {
+		(document.getElementById("button-generate-answer-points") as Button).disabled = true;
+		(document.getElementById("button-generate-answer-points") as Button).title = 'In Process...';
+		const data: Record<string, string>[] = await loadDataFromGrid('question-references-grid');
+		vscode.postMessage({
+			command: "generate answer and points",
+			data: data,
 		});
 	};
 
@@ -165,20 +227,16 @@ function init() {
 	window.addEventListener('message', async event => {
 		const message = event.data;
 		switch (message.command) {
-			case 'benchmark begin': {
+			case 'instantiate questions begin': {
 				(document.getElementById('placeholder-instantiation-checkbox') as HTMLElement).textContent = 'Placeholder Instantiating...';
-				(document.getElementById('placeholder-instantiation-progress-ring') as HTMLElement).style.display = 'block';
-				(document.getElementById('placeholder-section') as HTMLElement).style.display = 'block';
+				(document.getElementById('placeholder-instantiation-progress-wrapper') as HTMLElement).style.display = 'block';
 				break;
 			}
-			case 'benchmark instances': {
-				(document.getElementById('placeholder-instantiation-checkbox') as HTMLElement).textContent = 'Placeholder Instantiation Done';
-				(document.getElementById('placeholder-instantiation-checkbox') as HTMLElement).setAttribute('checked', 'true');
-				(document.getElementById('placeholder-instantiation-progress-ring') as HTMLElement).style.display = 'none';
-
-				(document.getElementById('question-instantiation-checkbox') as HTMLElement).textContent = 'Question Instantiating...';
-				(document.getElementById('question-instantiation-progress-ring') as HTMLElement).style.display = 'block';
-
+			case 'instantiate questions processs': {
+				(document.getElementById('placeholder-instantiation-progress-bar') as HTMLElement).style.width = message.percent + '%';
+				(document.getElementById('placeholder-instantiation-progress-bar') as HTMLElement).textContent = message.percent + '%';
+			}
+			case 'instantiate questions placeholder instances': {
 				const instances: PlaceholderInstance = message.instances;
 				const rowsData: Record<string, string>[] = [];
 
@@ -205,17 +263,12 @@ function init() {
 				await fillGrid('placeholder-instances-grid', rowsData);
 
 				addLinkEventListener('placeholder-data-link', expectedVscodeLinkCount);
+
+				(document.getElementById('placeholder-instantiation-checkbox') as HTMLElement).textContent = 'Placeholder Instantiation Done, Question Instantiating...';
 				(document.getElementById('placeholder-instances-grid') as HTMLElement).style.display = 'block';
 				break;
 			}
-			case 'benchmark questions': {
-				(document.getElementById('question-instantiation-checkbox') as HTMLElement).textContent = 'Question Instantiation Done';
-				(document.getElementById('question-instantiation-checkbox') as HTMLElement).setAttribute('checked', 'true');
-				(document.getElementById('question-instantiation-progress-ring') as HTMLElement).style.display = 'none';
-
-				(document.getElementById('label-reference-checkbox') as HTMLElement).textContent = 'Labeling Relevant Context References...';
-				(document.getElementById('label-reference-progress-ring') as HTMLElement).style.display = 'block';
-
+			case 'instantiate questions question instances': {
 				const questions: QuestionInstance[] = message.questions;
 				const workspacePath = message.workspacePath;
 
@@ -238,27 +291,40 @@ function init() {
 					};
 				}));
 
-				fillGrid('question-references-grid', questions.map(element => {
-					return {
-						'Questions': element.question,
-						'References': '',
-						'Reason': '',
-					};
-				}));
-
 				addLinkEventListener('question-data-link', expectedVscodeLinkCount);
+
+				(document.getElementById('placeholder-instantiation-checkbox') as HTMLElement).textContent = 'Placeholder And Question Instantiation Done';
+				(document.getElementById('placeholder-instantiation-checkbox') as HTMLElement).setAttribute('checked', 'true');
 				(document.getElementById('question-instances-grid') as HTMLElement).style.display = 'block';
-				(document.getElementById('question-references-grid') as HTMLElement).style.display = 'block';
+				(document.getElementById('button-label-reference') as Button)!.disabled = false;
+				(document.getElementById("button-instantiate-questions") as Button).disabled = false;
 				break;
 			}
-			case 'benchmark context': {
+			case 'benchmark references': {
 				switch (message.type) {
+					case 'init': {
+						fillGrid('question-references-grid', message.questions.map(question => {
+							return {
+								'Question': question,
+								'Reference': '',
+								'Reason': '',
+							};
+						}));
+						(document.getElementById('question-references-grid') as HTMLElement).style.display = 'block';
+						(document.getElementById('reference-progress-wrapper') as HTMLElement).style.display = 'block';
+						break;
+					}
 					case 'question': {
 						contextGridRowIndex += 1;
 						contextGridRowVscodeLinkCount = 0;
+						(document.getElementById('reference-checkbox') as HTMLElement).innerHTML = `Labeling References for question '<strong>${message.question}</strong>'`;
+						(document.getElementById('reference-progress-bar') as HTMLElement).style.width = '0%';
+						(document.getElementById('reference-progress-bar') as HTMLElement).textContent = '0%';
 						break;
 					}
 					case 'analyse file': {
+						(document.getElementById('reference-checkbox') as HTMLElement).innerHTML = `Labeling References for question '<strong>${message.question}</strong>' in file: <vscode-link class="reference-progress-link" data-type="File" data-value="${message.file}">${message.relativePath}</vscode-link>`;
+						addLinkEventListener(`reference-progress-link`, 1);
 						break;
 					}
 					case 'references': {
@@ -273,7 +339,13 @@ function init() {
 						);
 						contextGridRowVscodeLinkCount += 1;
 						addLinkEventListener(`question-context-link-${contextGridRowIndex}`, contextGridRowVscodeLinkCount);
+						(document.getElementById('reference-progress-bar') as HTMLElement).style.width = message.percent + '%';
+						(document.getElementById('reference-progress-bar') as HTMLElement).textContent = message.percent + '%';
 						break;
+					}
+					case 'done': {
+						(document.getElementById('button-generate-answer-points') as Button)!.disabled = false;
+						(document.getElementById("button-label-reference") as Button).disabled = false;
 					}
 				}
 				break;

@@ -1,6 +1,6 @@
 import { Disposable, Uri, Webview, WebviewPanel, window, ViewColumn } from "vscode";
 import { getWebviewContent } from "../gui/benchmark";
-import { constructBenchmark } from "../benchmark/main";
+import { constructBenchmark, generateAnswerAndPoints, instantiateQuestions, labelRelevantContext } from "../benchmark/main";
 import { handleLink } from './main';
 
 import { testLLM } from './llm';
@@ -33,6 +33,15 @@ export class BenchmarkWebviewPanel {
 				switch (message.command) {
 					case 'benchmarkConstruct':
 						constructBenchmark();
+						return;
+					case 'instantiate questions':
+						instantiateQuestions(message.questionNum);
+						return;
+					case 'label references':
+						labelRelevantContext(message.questions);
+						return;
+					case 'generate answer and points':
+						generateAnswerAndPoints(message.data);
 						return;
 					case 'link':
 						handleLink(message.type, message.value);

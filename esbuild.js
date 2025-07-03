@@ -2,7 +2,6 @@ const { log, time } = require("console");
 const { build } = require("esbuild");
 const { copy } = require("esbuild-plugin-copy");
 const fs = require('fs');
-const { platform } = require("os");
 const path = require('path');
 
 function deleteFolderRecursive(dirPath) {
@@ -80,16 +79,6 @@ const webviewConfig = {
 	],
 };
 
-const languageParserConfig = {
-	...baseConfig,
-	platform: 'node',
-	target: 'es2020',
-	format: 'cjs',
-	entryPoints: ["./src/benchmark/languageAnalyser/parser.ts"],
-	outfile: "./out/parser.js",
-	external: ["node-gyp-build", "tree-sitter", "tree-sitter-python"],  // 排除原生模块
-};
-
 // This watch config adheres to the conventions of the esbuild-problem-matchers
 // extension (https://github.com/connor4312/esbuild-problem-matchers#esbuild-via-js)
 /** @type BuildOptions */
@@ -126,17 +115,12 @@ const watchConfig = {
 				...webviewConfig,
 				...watchConfig,
 			});
-			await build({
-				...languageParserConfig,
-				...watchConfig,
-			});
 			timedLog("Build --watch finished. Waiting for changes...");
 		} else {
 			timedLog("Build started. Watching for changes...");
 			// Build extension and webview code
 			await build(extensionConfig);
 			await build(webviewConfig);
-			await build(languageParserConfig);
 			timedLog("Build completed");
 		}
 	} catch (err) {
