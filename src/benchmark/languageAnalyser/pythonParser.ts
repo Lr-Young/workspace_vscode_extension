@@ -1,7 +1,8 @@
 
-import { CodeChunk, CodeParser, Language } from './parser';
+import { CodeChunk, CodeParser, Language, location } from './parser';
 import { Placeholder, PlaceholderInstance } from '../typeDefinitions';
 import * as fs from 'fs';
+import * as path from 'path';
 
 import Parser = require('tree-sitter');
 import Python = require('tree-sitter-python');
@@ -23,7 +24,7 @@ export class PythonCodeParser implements CodeParser {
 		// todo
 		return [
 			{
-				filePath: '/example/path',
+				relativePath: '/example/path',
 				startLine: 10,
 				endLine: 30,
 				type: 'class',
@@ -47,10 +48,6 @@ export class PythonCodeParser implements CodeParser {
 
 		const tree = this.parser.parse(content);
 
-		const locator = (node: Parser.SyntaxNode) => {
-			return `${filePath}#${node.startPosition.row}#${node.text}`;
-		};
-
 		for (let i = 0; i < tree.rootNode.namedChildCount; i++) {
 			const node = tree.rootNode.namedChild(i);
 
@@ -65,7 +62,7 @@ export class PythonCodeParser implements CodeParser {
 			if (node.type === 'function_definition') {
 				const nameNode = node.childForFieldName('name');
 				if (nameNode) {
-					instances[Placeholder.Function].push(locator(nameNode));
+					instances[Placeholder.Function].push(location(nameNode, filePath));
 				}
 				continue;
 			}
@@ -73,7 +70,7 @@ export class PythonCodeParser implements CodeParser {
 			if (node.type === 'class_definition') {
 				const nameNode = node.childForFieldName('name');
 				if (nameNode) {
-					instances[Placeholder.Class].push(locator(nameNode));
+					instances[Placeholder.Class].push(location(nameNode, filePath));
 				}
 				continue;
 			}
@@ -83,10 +80,10 @@ export class PythonCodeParser implements CodeParser {
 				if (childNode?.type === 'assignment') {
 					const leftSide = childNode.firstNamedChild;
 					if (leftSide?.type === 'identifier') {
-						instances[Placeholder.Variable].push(locator(leftSide));
+						instances[Placeholder.Variable].push(location(leftSide, filePath));
 					}
 				} else if (childNode?.type === 'identifier') {
-					instances[Placeholder.Variable].push(locator(childNode));
+					instances[Placeholder.Variable].push(location(childNode, filePath));
 				}
 				continue;
 			}

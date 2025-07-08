@@ -138,7 +138,6 @@ vscode-panels {
 .vertical {
   display: flex;
   flex-direction: column; /* 垂直排列子元素 */
-  width: 50%;
 }
 
 .test-p {

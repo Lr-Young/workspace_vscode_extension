@@ -56,7 +56,7 @@ export class QuestionTemplate {
 }
 
 export type FileChunk = {
-	readonly filePath: string;
+	readonly relativePath: string;
 	readonly startLine: number;
 	readonly endLine: number;
 }

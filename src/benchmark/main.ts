@@ -14,9 +14,15 @@ const excludePattern = [
     '**/node_modules/**',
     '**/.*/**',
     '**/.*',
+    '**/*.lock',
+    '**/.gitignore',
 ];
 
 const questionTemplates: QuestionTemplate[] = [
+    `What is the implementation logic of class ${Placeholder.Class}`,
+	`What is the implementation logic of function ${Placeholder.Function}`,
+	`What is the usage of class ${Placeholder.Class}`,
+	`What is the usage of function ${Placeholder.Function}`,
 	`Can directory ${Placeholder.Folder} be removed?`,
 	`Can file ${Placeholder.File} be remove?`,
 	`What is the meaning of directory ${Placeholder.Folder}?`,
@@ -27,15 +33,11 @@ const questionTemplates: QuestionTemplate[] = [
 	`What is the role of class ${Placeholder.Class}?`,
 	`What is the role of directory ${Placeholder.Folder}?`,
 	`What is the role of variable ${Placeholder.Variable}?`,
-	`What is the implementation logic of class ${Placeholder.Class}`,
-	`What is the implementation logic of function ${Placeholder.Function}`,
-	`What is the usage of class ${Placeholder.Class}`,
-	`What is the usage of function ${Placeholder.Function}`,
 ].map(str => {
 	return new QuestionTemplate(str);
 });
 
-let workspacePath: string = '';
+export let workspacePath: string = '';
 let repoName: string = '';
 export let logger: LLMLogger;
 
@@ -53,45 +55,47 @@ function checkWorkspaceFolder(): boolean {
     workspacePath = `${vscode.workspace.workspaceFolders[0].uri.fsPath}${path.sep}`;
     repoName = vscode.workspace.workspaceFolders[0].name;
 
-    logger = new LLMLogger(workspacePath);
+    logger = LLMLogger.getInstance(workspacePath);
 
     return true;
 }
 
 export async function handleLink(type: string, value: string) {
+    const splits: string[] = value.split('#');
+    const filePath: string = `${splits[0]}${splits[1]}`;
     switch (type) {
         case 'Folder':
-            await vscode.commands.executeCommand('revealInExplorer', vscode.Uri.file(value));
+            await vscode.commands.executeCommand('revealInExplorer', vscode.Uri.file(filePath));
             return;
         case 'File':
-            const document = await vscode.workspace.openTextDocument(value);
+            const document = await vscode.workspace.openTextDocument(filePath);
             await vscode.window.showTextDocument(document, {preview: false});
             return;
         case 'Position': {
-            const values = value.split('#');
-            const filePath = values[0];
-            const line = parseInt(values[1]);
+            const startRow = parseInt(splits[2]);
+            const startColumn = parseInt(splits[3]);
+            const endRow = parseInt(splits[4]);
+            const endColumn = parseInt(splits[5]);
             const doc = await vscode.workspace.openTextDocument(filePath);
             const editor = await vscode.window.showTextDocument(doc, {preview: false});
-            const position = new vscode.Position(line, 0);
-            editor.selection = new vscode.Selection(position, position);
-            editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
+            const startPosition = new vscode.Position(startRow, startColumn);
+            const endPosition = new vscode.Position(endRow, endColumn);
+            editor.selection = new vscode.Selection(startPosition, endPosition);
+            editor.revealRange(new vscode.Range(startPosition, endPosition), vscode.TextEditorRevealType.InCenter);
             return; 
         }
         case 'Range': {
-            const values = value.split('#');
-            const filePath = values[0];
-            const startLine: number = parseInt(values[1]);
-            const endLine: number = parseInt(values[2]);
+            const startLine: number = parseInt(splits[2]);
+            const endLine: number = parseInt(splits[3]);
             const doc = await vscode.workspace.openTextDocument(filePath);
             const editor = await vscode.window.showTextDocument(doc);
-            const startPos = new vscode.Position(startLine, 0);
-            const endPos = new vscode.Position(endLine, 
-                doc.lineAt(endLine).text.length);
+            const startPos = new vscode.Position(startLine - 1, 0);
+            const endPos = new vscode.Position(endLine - 1, 
+                doc.lineAt(endLine - 1).text.length);
             editor.selection = new vscode.Selection(startPos, endPos);
             editor.revealRange(new vscode.Range(startPos, endPos));
         }
-            
+
     }
 }
 
@@ -137,7 +141,7 @@ async function getPlaceholderInstances(): Promise<PlaceholderInstance> {
         instances[Placeholder.Folder].push(relativePath(dirPath));
     });
 
-    Object.entries(((await parseFiles(files)))).forEach(([key, value]) => {
+    Object.entries(await parseFiles(files)).forEach(([key, value]) => {
         value.forEach(element => {
             instances[key].push(element);
         });
@@ -147,7 +151,7 @@ async function getPlaceholderInstances(): Promise<PlaceholderInstance> {
 }
 
 function instantiate(questionNum: number, placeHolderInstances: PlaceholderInstance): QuestionInstance[] {
-    
+
 	const questions: QuestionInstance[] = [];
 
 	const selectors: {
@@ -183,7 +187,7 @@ function instantiate(questionNum: number, placeHolderInstances: PlaceholderInsta
             if (template.placeholder === Placeholder.File || template.placeholder === Placeholder.Folder) {
                 instance = selector.instances[selector.index];
             } else {
-                instance = selector.instances[selector.index].split('#')[2];
+                instance = selector.instances[selector.index].split('#')[6];
             }
             questions.push({
                 question: template.instantiate(instance),
@@ -258,20 +262,18 @@ export async function labelRelevantContext(questions: string[]): Promise<void> {
                 command: 'benchmark references',
                 type: 'analyse file',
                 question: question,
-                file: file,
+                workspacePath: workspacePath,
                 relativePath: path.relative(workspacePath, file),
+                percent: (count / files.length * 100).toFixed(2),
             });
-            const relativePath: string = path.join(repoName, path.relative(workspacePath, file));
-            const context: QuestionContext = await agent.mockInvoke(question, file, relativePath, repoName);
-            await sleep(2000);
+            const context: QuestionContext = await agent.mockInvoke(question, file, path.relative(workspacePath, file), repoName);
             if (context.references.length > 0) {
                 postMessage({
                     command: 'benchmark references',
                     type: 'references',
                     references: context.references,
                     reason: context.reason,
-                    relativePath: relativePath,
-                    percent: (count / files.length * 100).toFixed(2),
+                    workspacePath: workspacePath,
                 });
             }
         }
@@ -282,32 +284,36 @@ export async function labelRelevantContext(questions: string[]): Promise<void> {
     });
 }
 
-export async function generateAnswerAndPoints(data: Record<string, string>[]): Promise<void> {
+export async function generateAnswerAndPoints(data: Record<string, string[]>): Promise<void> {
 
     if (!checkWorkspaceFolder()) {
         return;
     }
 
+    postMessage({
+        command: 'benchmark answer',
+        type: 'init',
+    });
+
     const pattern = /^<vscode-link[^>]*>([^:]*):(\d+)~(\d+)<\/vscode-link>$/;
 
-    const questions: string[] = [];
+    const questions: string[] = data['Question'];
     const references: FileChunk[][] = [];
 
-    data.forEach(element => {
-        questions.push(element['Question']);
+    data['Reference'].forEach(element => {
         const reference: FileChunk[] = [];
-        element['Reference'].split('<br>').map(link => {
+        element.split('<br>').map(link => {
             const match = link.match(pattern);
             if (match) {
                 if (match[1].startsWith(repoName)) {
                     reference.push({
-                        filePath: path.join(path.dirname(workspacePath), match[1]),
+                        relativePath: path.relative(repoName, match[1]),
                         startLine: parseInt(match[2]),
                         endLine: parseInt(match[3]),
                     });
                 } else {
                     reference.push({
-                        filePath: path.join(workspacePath, match[1]),
+                        relativePath: match[1],
                         startLine: parseInt(match[2]),
                         endLine: parseInt(match[3]),
                     });
@@ -317,45 +323,76 @@ export async function generateAnswerAndPoints(data: Record<string, string>[]): P
         references.push(reference);
     });
 
+    if (questions.length !== references.length) {
+        postMessage({
+            command: 'benchmark fail',
+            type: 'generate answer',
+            error: `questions length ${questions.length} is not equal references length ${references.length}`,
+        });
+        return;
+    }
+
     const answerAgent: AnswerAgent = new AnswerAgent();
     
     const pointsAgent: PointsAgent = new PointsAgent();
 
+    for (let i = 0; i < questions.length; i++) {
+        postMessage({
+            command: 'benchmark answer',
+            type: 'question',
+            question: questions[i],
+        });
+        const answer: string = await answerAgent.mockInvoke(questions[i], references[i], workspacePath, repoName);
+        const points: string = await pointsAgent.mockInvoke(questions[i], answer);
+        postMessage({
+            command: 'benchmark answer',
+            type: 'answer',
+            answer: answer,
+            points: points,
+            percent: ((i + 1) / questions.length * 100).toFixed(2),
+        });
+    }
 
+    postMessage({
+        command: 'benchmark answer',
+        type: 'done',
+    });
+    
+    return;
 
 }
 
 export async function constructBenchmark() {
 
-    if (vscode.workspace.workspaceFolders === undefined || vscode.workspace.workspaceFolders.length !== 1) {
-        vscode.window.showErrorMessage("请在工作区打开一个目录");
-        postMessage({
-            command: 'benchmark fail',
-            type: 'workspace folder not one',
-            error: '请保证工作区只有一个打开的目录'
-        });
-        return;
-    }
+    // if (vscode.workspace.workspaceFolders === undefined || vscode.workspace.workspaceFolders.length !== 1) {
+    //     vscode.window.showErrorMessage("请在工作区打开一个目录");
+    //     postMessage({
+    //         command: 'benchmark fail',
+    //         type: 'workspace folder not one',
+    //         error: '请保证工作区只有一个打开的目录'
+    //     });
+    //     return;
+    // }
 
-    workspacePath = `${vscode.workspace.workspaceFolders[0].uri.fsPath}${path.sep}`;
-    repoName = vscode.workspace.workspaceFolders[0].name;
+    // workspacePath = `${vscode.workspace.workspaceFolders[0].uri.fsPath}${path.sep}`;
+    // repoName = vscode.workspace.workspaceFolders[0].name;
 
-    logger = new LLMLogger(workspacePath);
+    // logger = new LLMLogger(workspacePath);
 
-    postMessage({command: 'benchmark begin'});
+    // postMessage({command: 'benchmark begin'});
 
-    const instances = await getPlaceholderInstances();
-    postMessage({
-        command: 'benchmark instances',
-        instances: instances,
-    });
+    // const instances = await getPlaceholderInstances();
+    // postMessage({
+    //     command: 'benchmark instances',
+    //     instances: instances,
+    // });
 
-    const questions = instantiate(10, instances);
-    postMessage({
-        command: 'benchmark questions',
-        questions: questions,
-        workspacePath: workspacePath,
-    });
+    // const questions = instantiate(10, instances);
+    // postMessage({
+    //     command: 'benchmark questions',
+    //     questions: questions,
+    //     workspacePath: workspacePath,
+    // });
 
     // await labelRelevantContext(questions);
     // postMessage({

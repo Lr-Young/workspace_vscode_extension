@@ -13,6 +13,7 @@ import { FileChunk, getFileLanguage, QuestionContext } from './typeDefinitions';
 import { postMessage } from './benchmarkWebviewPanel';
 import { getGenerateAnswerPrompt, getExtractRelevantFileSnippetPrompt, getGeneratePointsPrompt } from './prompt';
 import { logger } from './main';
+import { sleep } from "../utils";
 
 type ParseOutput = {success: boolean, ranges: {start: number, end: number}[], reason: string};
 
@@ -35,7 +36,7 @@ class QuestionContextOutputParser extends BaseOutputParser {
             return context;
         }
 
-        context.reason = splits[0].split('[Analysis]')[0];
+        context.reason = splits[0].split('[Analysis]')[1];
 
         try {
             const answer:{start: number, end: number}[] = JSON.parse(splits[splits.length - 1].trim());
@@ -126,15 +127,14 @@ export class ContextAgent {
 
         this.outputParser = new QuestionContextOutputParser();
 
-        this.chain = this.prompt.pipe(this.model).pipe(this.outputParser);
         this.chain = this.prompt
             .pipe(RunnableLambda.from(async (input: any) => {
-                logger.log(`Context Agent Input\n${JSON.stringify(input, null, 4)}`);
+                logger.log(input);
                 return input;
             }))
             .pipe(this.model)
             .pipe(RunnableLambda.from(async (output: any) => {
-                logger.log(`Context Agent Output\n${JSON.stringify(output, null, 4)}`);
+                logger.log(output);
                 return output;
             }))
             .pipe(this.outputParser);
@@ -164,7 +164,7 @@ export class ContextAgent {
 
         output.ranges.forEach(range => {
             context.references.push({
-                filePath: filePath,
+                relativePath: relativePath,
                 startLine: range.start,
                 endLine: range.end,
             });
@@ -176,6 +176,9 @@ export class ContextAgent {
     }
 
     async mockInvoke(question: string, filePath: string, relativePath: string, repoName: string): Promise<QuestionContext> {
+        
+        await sleep(200);
+
         const context: QuestionContext = {
             question: question,
             references: [],
@@ -191,22 +194,24 @@ export class ContextAgent {
             return context;
         }
 
+        const halfLine: number = Math.floor(totalLines / 2);
+
         context.references.push({
-            filePath: filePath,
-            startLine: 0,
-            endLine: totalLines / 2,
+            relativePath: relativePath,
+            startLine: 1,
+            endLine: halfLine,
         });
 
         context.references.push({
-            filePath: filePath,
-            startLine: totalLines / 2,
-            endLine: totalLines / 2,
+            relativePath: relativePath,
+            startLine: halfLine,
+            endLine: halfLine,
         });
 
         context.references.push({
-            filePath: filePath,
-            startLine: totalLines / 2,
-            endLine: totalLines - 1,
+            relativePath: relativePath,
+            startLine: halfLine,
+            endLine: totalLines,
         });
 
         context.reason = 'Mock Reason';
@@ -241,15 +246,14 @@ export class AnswerAgent {
 
         this.outputParser = new AnswerOutputParser();
 
-        this.chain = this.prompt.pipe(this.model).pipe(this.outputParser);
         this.chain = this.prompt
             .pipe(RunnableLambda.from(async (input: any) => {
-                logger.log(`Answer Agent Input\n${JSON.stringify(input, null, 4)}`);
+                logger.log(input);
                 return input;
             }))
             .pipe(this.model)
             .pipe(RunnableLambda.from(async (output: any) => {
-                logger.log(`Answer Agent Output\n${JSON.stringify(output, null, 4)}`);
+                logger.log(output);
                 return output;
             }))
             .pipe(this.outputParser);
@@ -264,11 +268,11 @@ export class AnswerAgent {
         }[] = [];
 
         for (const reference of references) {
-            const content: string = readFileSync(reference.filePath, 'utf8');
+            const content: string = readFileSync(path.join(workspacePath, reference.relativePath), 'utf8');
             promptReferences.push({
-                relativePath: path.join(repoName, path.relative(workspacePath, reference.filePath)),
+                relativePath: path.join(repoName, reference.relativePath),
                 content: content,
-                language: getFileLanguage(reference.filePath),
+                language: getFileLanguage(reference.relativePath),
             });
         }
 
@@ -278,6 +282,11 @@ export class AnswerAgent {
         });
 
         return output;
+    }
+
+    async mockInvoke(question: string, references: FileChunk[], workspacePath: string, repoName: string): Promise<string> {
+        await sleep(1000);
+        return "Mock Answer";
     }
 
 }
@@ -308,15 +317,14 @@ export class PointsAgent {
 
         this.outputParser = new PointsOutputParser();
 
-        this.chain = this.prompt.pipe(this.model).pipe(this.outputParser);
         this.chain = this.prompt
             .pipe(RunnableLambda.from(async (input: any) => {
-                logger.log(`Points Agent Input\n${JSON.stringify(input, null, 4)}`);
+                logger.log(input);
                 return input;
             }))
             .pipe(this.model)
             .pipe(RunnableLambda.from(async (output: any) => {
-                logger.log(`Points Agent Output\n${JSON.stringify(output, null, 4)}`);
+                logger.log(output);
                 return output;
             }))
             .pipe(this.outputParser);
@@ -329,6 +337,11 @@ export class PointsAgent {
         });
 
         return output;
+    }
+
+    async mockInvoke(question: string, answer: string): Promise<string> {
+        await sleep(1000);
+        return "Mock Points";
     }
 
 }

@@ -7,6 +7,7 @@ import Parser = require('tree-sitter');
 
 import { postMessage } from '../benchmarkWebviewPanel';
 import { sleep } from '../../utils';
+import { workspacePath } from '../main';
 
 const extToParser: Record<string, CodeParser> = {};
 
@@ -35,6 +36,10 @@ export interface CodeParser {
 	readonly parser: Parser;
 	parse(filePath: string): Promise<CodeChunk[]>;
 	parsePlaceHolderInstances(filePath: string): Promise<PlaceholderInstance>;
+}
+
+export function location(node: Parser.SyntaxNode, filePath: string): string {
+	return `${workspacePath}#${path.relative(workspacePath, filePath)}#${node.startPosition.row}#${node.startPosition.column}#${node.endPosition.row}#${node.endPosition.column}#${node.text}`;
 }
 
 export async function parseFiles(files: string[]): Promise<PlaceholderInstance> {

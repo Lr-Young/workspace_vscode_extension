@@ -49,11 +49,7 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
     <h1>Workspace Benchmark Dataset</h1>
     <vscode-divider role="separator"></vscode-divider>
 
-	<div id="test"></div>
-    <vscode-button appearance="primary" id="test-constructing">Test Button</vscode-button>
-	<vscode-divider role="separator"></vscode-divider>
-
-    <div class="horizontal">
+    <div class="vertical">
         <p>Choose Question Instances JSON File</p>
         <input type="file" id="question-instances-file-input" accept=".json"/>
         <vscode-button appearance="primary" id="button-instantiate-questions-file">Load Question Instances from a JSON File</vscode-button>
@@ -120,40 +116,21 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
 
     <vscode-divider role="separator"></vscode-divider>
 
-    <section class="component-container">
-        <section class="">
-            <h2>Step 1: Placeholder and Question Instantiation</h2>
+    <script type="module" nonce="${nonce}" src="${webviewUri}"></script>
+</body>
 
-            <div class="horizontal progress">
-                <vscode-checkbox readonly id="placeholder-instantiation-checkbox">Placeholder And Question Instantiation</vscode-checkbox>
-                <div class="progress-container hidden" id="placeholder-instantiation-progress-wrapper">
-                    <div class="progress-bar" id="placeholder-instantiation-progress-bar">0%</div>
-                </div>
-            </div>
+</html>
 
-            <div class="horizontal evenly">
-                <div class="group">
-                    <p>Number of Questions to Instantiate</p>
-                    <vscode-text-field type="number" min="1" value="10" id="instantiate-questions-number"></vscode-text-field>
-                    <vscode-button appearance="primary" id="button-instantiate-questions">Instantiate Questions</vscode-button>
-                </div>
-                
-                <div class="group">
-                    <p>Choose Question Instances JSON File</p>
-                    <input type="file" id="question-instances-file-input" accept=".json"/>
-                    <vscode-button appearance="primary" id="button-instantiate-questions-file">Load Question Instances from a JSON File</vscode-button>
-                </div>
-            </div>
+	`.trim();
+}
 
-        </section>
+/*
 
-    </section>
+<div id="test"></div>
+    <vscode-button appearance="primary" id="test-constructing">Test Button</vscode-button>
+	<vscode-divider role="separator"></vscode-divider>
 
-    <vscode-divider role="separator"></vscode-divider>
-
-    <vscode-divider role="separator"></vscode-divider>
-
-	<div class="hidden" id="placeholder-section">
+<div class="hidden" id="placeholder-section">
 		<section class="grid-one-column">
 			<section class="component-container">
                 <vscode-checkbox readonly id="question-instantiation-checkbox">Question Instantiation</vscode-checkbox>
@@ -209,5 +186,4 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
 </body>
 
 </html>
-	`.trim();
-}
+*/

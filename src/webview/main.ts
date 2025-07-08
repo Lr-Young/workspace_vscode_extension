@@ -13,6 +13,7 @@ import { sleep } from '../utils';
 const vscode = acquireVsCodeApi();
 let contextGridRowIndex: number = -1;
 let contextGridRowVscodeLinkCount: number;
+let answerGridRowIndex: number = -1;
 
 // In order to use all the Webview UI Toolkit web components they
 // must be registered with the browser (i.e. webview) using the
@@ -91,13 +92,12 @@ async function fillGrid(id: string, data: Record<string, string>[]): Promise<voi
 
 	do {
 		await sleep(100);
-		console.log('slept for 0.1s');
 		headerRow = grid?.querySelectorAll('vscode-data-grid-row[row-type="header"]');
 		rows = grid?.querySelectorAll('vscode-data-grid-row[row-type="default"]');
 	} while (headerRow.length !== 1 || rows.length !== data.length);
 
 	const titles: string[] = Array.from(headerRow[0].children).map(cell => {
-		return cell.textContent!.trim();
+		return cell.innerHTML!.trim();
 	});
 
 	for (let i = 0; i < rows.length; i++) {
@@ -111,8 +111,8 @@ async function fillGrid(id: string, data: Record<string, string>[]): Promise<voi
 	}
 }
 
-async function loadDataFromGrid(id: string): Promise<Record<string, string>[]> {
-	const data: Record<string, string>[] = [];
+async function loadDataFromGrid(id: string): Promise<Record<string, string[]>> {
+	const data: Record<string, string[]> = {};
 
 	const grid = document.getElementById(id) as DataGrid;
 
@@ -120,18 +120,14 @@ async function loadDataFromGrid(id: string): Promise<Record<string, string>[]> {
 
 	const rows = grid.querySelectorAll('vscode-data-grid-row[row-type="default"]');
 
-	if (headerRow.length !== 1) {
-		console.error(`Error when loading data from grid: no header row found`);
-		return data;
-	}
-
-	if (rows.length === 0) {
-		console.error(`Error when loading data from grid: no data rows found`);
+	if (headerRow.length === 0 || rows.length === 0) {
 		return data;
 	}
 
 	const titles: string[] = Array.from(headerRow[0].children).map(cell => {
-		return cell.textContent!.trim();
+		const title: string = cell.innerHTML!.trim();
+		data[title] = [];
+		return title;
 	});
 
 	for (let i = 0; i < rows.length; i++) {
@@ -139,12 +135,55 @@ async function loadDataFromGrid(id: string): Promise<Record<string, string>[]> {
 		const cells = row.querySelectorAll('vscode-data-grid-cell');
 		const rowData: Record<string, string> = {};
 		for (let j = 0; j < cells.length; j++) {
-			rowData[titles[j]] = cells[j].innerHTML;
+			data[titles[j]].push(cells[j].innerHTML);
 		}
-		data.push(rowData);
 	}
 
 	return data;
+}
+
+async function gridDataToJson(): Promise<Record<string, Record<string, string[]>>> {
+	const data: Record<string, Record<string, string[]>> = {};
+
+	const gridIds = [
+		'placeholder-instances-grid',
+		'question-instances-grid',
+		'question-references-grid',
+		'answer-point-grid',
+	];
+
+	for (const id of gridIds) {
+		const gridData: Record<string, string[]> = await loadDataFromGrid(id);
+		switch (id) {
+			case 'placeholder-instances-grid': {
+				gridData['Instances'].forEach((_, index) => {
+					const splits: string[] = gridData['Instances'][index].split(', ');
+					
+				});
+				break;
+			}
+			case 'question-instances-grid': {
+
+				break;
+			}
+			case 'question-references-grid': {
+				
+				break;
+			}
+			case 'answer-point-grid': {
+				
+				break;
+			}
+		}
+		data[id] = gridData;
+	}
+
+
+	return data;
+}
+
+async function jsonToGridData(data: Record<string, Record<string, string>>): Promise<void> {
+
 }
 
 function loadData(): void {
@@ -161,14 +200,14 @@ function loadData(): void {
 function test(content: string): void {
 	const now = new Date();
 	const child = document.createElement('p');
-	child.textContent = `[${now.toLocaleString()}] ${content}`;
+	child.innerHTML = `[${now.toLocaleString()}] ${content}`;
 	child.classList.add('test-p');
 	(document.getElementById('test') as HTMLElement).append(child);
 }
 
 function init() {
 
-	loadData();
+	// loadData();
 
 	(document.getElementById("button-instantiate-questions") as Button).onclick = (event) => {
 		(document.getElementById("button-instantiate-questions") as Button).disabled = true;
@@ -183,31 +222,28 @@ function init() {
 	(document.getElementById("button-label-reference") as Button).onclick = async (event) => {
 		(document.getElementById("button-label-reference") as Button).disabled = true;
 		(document.getElementById("button-label-reference") as Button).title = 'In Process...';
-		const data: Record<string, string>[] = await loadDataFromGrid('question-instances-grid');
-		const questions: string[] = data.map(element => {
-			return element['Question'];
-		});
+		const data: Record<string, string[]> = await loadDataFromGrid('question-instances-grid');
 		vscode.postMessage({
 			command: "label references",
-			questions: questions,
+			questions: data['Question'],
 		});
 	};
 
 	(document.getElementById('button-generate-answer-points') as Button).onclick = async (event) => {
 		(document.getElementById("button-generate-answer-points") as Button).disabled = true;
 		(document.getElementById("button-generate-answer-points") as Button).title = 'In Process...';
-		const data: Record<string, string>[] = await loadDataFromGrid('question-references-grid');
+		const data: Record<string, string[]> = await loadDataFromGrid('question-references-grid');
 		vscode.postMessage({
 			command: "generate answer and points",
 			data: data,
 		});
 	};
 
-	(document.getElementById("test-constructing") as Button).onclick = (event) => {
-		vscode.postMessage({
-			command: "testButton",
-		});
-	};
+	// (document.getElementById("test-constructing") as Button).onclick = (event) => {
+	// 	vscode.postMessage({
+	// 		command: "testButton",
+	// 	});
+	// };
 
 	const addLinkEventListener = async (clazz: string, expectedCount: number) => {
 		do {
@@ -228,13 +264,14 @@ function init() {
 		const message = event.data;
 		switch (message.command) {
 			case 'instantiate questions begin': {
-				(document.getElementById('placeholder-instantiation-checkbox') as HTMLElement).textContent = 'Placeholder Instantiating...';
+				(document.getElementById('placeholder-instantiation-checkbox') as HTMLElement).innerHTML = 'Placeholder Instantiating...';
 				(document.getElementById('placeholder-instantiation-progress-wrapper') as HTMLElement).style.display = 'block';
 				break;
 			}
 			case 'instantiate questions processs': {
 				(document.getElementById('placeholder-instantiation-progress-bar') as HTMLElement).style.width = message.percent + '%';
-				(document.getElementById('placeholder-instantiation-progress-bar') as HTMLElement).textContent = message.percent + '%';
+				(document.getElementById('placeholder-instantiation-progress-bar') as HTMLElement).innerHTML = message.percent + '%';
+				break;
 			}
 			case 'instantiate questions placeholder instances': {
 				const instances: PlaceholderInstance = message.instances;
@@ -244,13 +281,13 @@ function init() {
 
 				Object.entries(Placeholder).forEach(([_, placeholder]) => {
 					let content: string = '';
-					[...instances[placeholder]].forEach(element => {
+					[...(instances[placeholder])].forEach(element => {
 						if (placeholder === Placeholder.File) {
-							content += `<vscode-link class="placeholder-data-link" data-type="File" data-value="${instances['WorkspacePath']}${element}">${element}</vscode-link>, `;
+							content += `<vscode-link class="placeholder-data-link" data-type="File" data-value="${instances['WorkspacePath']}#${element}">${element}</vscode-link>, `;
 						} else if (placeholder === Placeholder.Folder) {
-							content += `<vscode-link class="placeholder-data-link" data-type="Folder" data-value="${instances['WorkspacePath']}${element}">${element}</vscode-link>, `;
+							content += `<vscode-link class="placeholder-data-link" data-type="Folder" data-value="${instances['WorkspacePath']}#${element}">${element}</vscode-link>, `;
 						} else {
-							content += `<vscode-link class="placeholder-data-link" data-type="Position" data-value="${element}">${element.split('#')[2]}</vscode-link>, `;
+							content += `<vscode-link class="placeholder-data-link" data-type="Position" data-value="${element}">${element.split('#')[6]}</vscode-link>, `;
 						}
 						expectedVscodeLinkCount += 1;
 					});
@@ -264,7 +301,7 @@ function init() {
 
 				addLinkEventListener('placeholder-data-link', expectedVscodeLinkCount);
 
-				(document.getElementById('placeholder-instantiation-checkbox') as HTMLElement).textContent = 'Placeholder Instantiation Done, Question Instantiating...';
+				(document.getElementById('placeholder-instantiation-checkbox') as HTMLElement).innerHTML = 'Placeholder Instantiation Done, Question Instantiating...';
 				(document.getElementById('placeholder-instances-grid') as HTMLElement).style.display = 'block';
 				break;
 			}
@@ -274,14 +311,14 @@ function init() {
 
 				let expectedVscodeLinkCount = 0;
 
-				fillGrid('question-instances-grid', questions.map(element => {
+				await fillGrid('question-instances-grid', questions.map(element => {
 					let instance: string;
 					if (element.placeholder === Placeholder.File) {
-						instance = `${element.placeholder}: <vscode-link class="question-data-link" data-type="File" data-value="${workspacePath}${element.placeholderInstance}">${element.placeholderInstance}</vscode-link>`;
+						instance = `${element.placeholder}: <vscode-link class="question-data-link" data-type="File" data-value="${workspacePath}#${element.placeholderInstance}">${element.placeholderInstance}</vscode-link>`;
 					} else if (element.placeholder === Placeholder.Folder) {
-						instance = `${element.placeholder}: <vscode-link class="question-data-link" data-type="Folder" data-value="${workspacePath}${element.placeholderInstance}">${element.placeholderInstance}</vscode-link>`;
+						instance = `${element.placeholder}: <vscode-link class="question-data-link" data-type="Folder" data-value="${workspacePath}#${element.placeholderInstance}">${element.placeholderInstance}</vscode-link>`;
 					} else {
-						instance = `${element.placeholder}: <vscode-link class="question-data-link" data-type="Position" data-value="${element.placeholderInstance}">${element.placeholderInstance.split('#')[2]}</vscode-link>`;
+						instance = `${element.placeholder}: <vscode-link class="question-data-link" data-type="Position" data-value="${element.placeholderInstance}">${element.placeholderInstance.split('#')[6]}</vscode-link>`;
 					}
 					expectedVscodeLinkCount += 1;
 					return {
@@ -293,7 +330,7 @@ function init() {
 
 				addLinkEventListener('question-data-link', expectedVscodeLinkCount);
 
-				(document.getElementById('placeholder-instantiation-checkbox') as HTMLElement).textContent = 'Placeholder And Question Instantiation Done';
+				(document.getElementById('placeholder-instantiation-checkbox') as HTMLElement).innerHTML = 'Placeholder And Question Instantiation Done';
 				(document.getElementById('placeholder-instantiation-checkbox') as HTMLElement).setAttribute('checked', 'true');
 				(document.getElementById('question-instances-grid') as HTMLElement).style.display = 'block';
 				(document.getElementById('button-label-reference') as Button)!.disabled = false;
@@ -303,11 +340,19 @@ function init() {
 			case 'benchmark references': {
 				switch (message.type) {
 					case 'init': {
-						fillGrid('question-references-grid', message.questions.map(question => {
+						await fillGrid('question-references-grid', message.questions.map(question => {
 							return {
 								'Question': question,
 								'Reference': '',
 								'Reason': '',
+							};
+						}));
+						await fillGrid('answer-point-grid', message.questions.map(question => {
+							return {
+								'Question': question,
+								'Reference': '',
+								'Answer': '',
+								'Evaluation': '',
 							};
 						}));
 						(document.getElementById('question-references-grid') as HTMLElement).style.display = 'block';
@@ -319,39 +364,75 @@ function init() {
 						contextGridRowVscodeLinkCount = 0;
 						(document.getElementById('reference-checkbox') as HTMLElement).innerHTML = `Labeling References for question '<strong>${message.question}</strong>'`;
 						(document.getElementById('reference-progress-bar') as HTMLElement).style.width = '0%';
-						(document.getElementById('reference-progress-bar') as HTMLElement).textContent = '0%';
+						(document.getElementById('reference-progress-bar') as HTMLElement).innerHTML = '0%';
 						break;
 					}
 					case 'analyse file': {
-						(document.getElementById('reference-checkbox') as HTMLElement).innerHTML = `Labeling References for question '<strong>${message.question}</strong>' in file: <vscode-link class="reference-progress-link" data-type="File" data-value="${message.file}">${message.relativePath}</vscode-link>`;
+						(document.getElementById('reference-checkbox') as HTMLElement).innerHTML = `Labeling References for question '<strong>${message.question}</strong>' in file: <vscode-link class="reference-progress-link" data-type="File" data-value="${message.workspacePath}#${message.relativePath}">${message.relativePath}</vscode-link>`;
 						addLinkEventListener(`reference-progress-link`, 1);
+						(document.getElementById('reference-progress-bar') as HTMLElement).style.width = message.percent + '%';
+						(document.getElementById('reference-progress-bar') as HTMLElement).innerHTML = message.percent + '%';
 						break;
 					}
 					case 'references': {
-						appendGridCell('question-references-grid', contextGridRowIndex, 1, 
-							(message.references as FileChunk[]).map(fileChunk => {
-								contextGridRowVscodeLinkCount += 1;
-								return `<vscode-link class="question-context-link-${contextGridRowIndex}" data-type="Range" data-value="${fileChunk.filePath}#${fileChunk.startLine}#${fileChunk.endLine}">${message.relativePath}:${fileChunk.startLine}~${fileChunk.endLine}</vscode-link>`;
-							}).join('<br>').trim()
-						);
-						appendGridCell('question-references-grid', contextGridRowIndex, 2, 
-							`<vscode-link class="question-context-link-${contextGridRowIndex}" data-type="File" data-value="${(message.references as FileChunk[])[0].filePath}">${message.relativePath}</vscode-link> Reason:<br>${message.reason}`
+						const references = (message.references as FileChunk[]).map(fileChunk => {
+							contextGridRowVscodeLinkCount += 2;
+							return `<vscode-link class="question-context-link-${contextGridRowIndex}" data-type="Range" data-value="${message.workspacePath}#${fileChunk.relativePath}#${fileChunk.startLine}#${fileChunk.endLine}">${fileChunk.relativePath}:${fileChunk.startLine}~${fileChunk.endLine}</vscode-link>`;
+						}).join('<br>').trim();
+
+						const relatviePath: string = (message.references as FileChunk[])[0].relativePath;
+
+						await appendGridCell('question-references-grid', contextGridRowIndex, 1, references);
+						await appendGridCell('answer-point-grid', contextGridRowIndex, 1, references);
+						await appendGridCell('question-references-grid', contextGridRowIndex, 2, 
+							`<vscode-link class="question-context-link-${contextGridRowIndex}" data-type="File" data-value="${message.workspacePath}#${relatviePath}">${relatviePath}</vscode-link> Reason:<br>${message.reason}`
 						);
 						contextGridRowVscodeLinkCount += 1;
 						addLinkEventListener(`question-context-link-${contextGridRowIndex}`, contextGridRowVscodeLinkCount);
-						(document.getElementById('reference-progress-bar') as HTMLElement).style.width = message.percent + '%';
-						(document.getElementById('reference-progress-bar') as HTMLElement).textContent = message.percent + '%';
 						break;
 					}
 					case 'done': {
 						(document.getElementById('button-generate-answer-points') as Button)!.disabled = false;
 						(document.getElementById("button-label-reference") as Button).disabled = false;
+						(document.getElementById('reference-checkbox') as HTMLElement).innerHTML = `Labeling References Done`;
+						(document.getElementById('reference-checkbox') as HTMLElement).setAttribute('checked', 'true');
+						break;
+					}
+				}
+				break;
+			}
+			case 'benchmark answer': {
+				switch (message.type) {
+					case 'init': {
+						(document.getElementById('answer-point-grid') as HTMLElement).style.display = 'block';
+						(document.getElementById('answer-point-progress-wrapper') as HTMLElement).style.display = 'block';
+						(document.getElementById('answer-point-progress-bar') as HTMLElement).style.width = '0%';
+						(document.getElementById('answer-point-progress-bar') as HTMLElement).innerHTML = '0%';
+						break;
+					}
+					case 'question': {
+						answerGridRowIndex += 1;
+						(document.getElementById('answer-point-checkbox') as HTMLElement).innerHTML = `Generating Answer and Evaluation for question '<strong>${message.question}</strong>'`;
+						break;
+					}
+					case 'answer': {
+						await appendGridCell('answer-point-grid', answerGridRowIndex, 2, message.answer);
+						await appendGridCell('answer-point-grid', answerGridRowIndex, 3, message.points);
+						(document.getElementById('answer-point-progress-bar') as HTMLElement).style.width = `${message.percent}%`;
+						(document.getElementById('answer-point-progress-bar') as HTMLElement).innerHTML = `${message.percent}%`;
+						break;
+					}
+					case 'done': {
+						(document.getElementById('answer-point-checkbox') as HTMLElement).innerHTML = `Generating Answer and Evaluation Done`;
+						(document.getElementById('answer-point-checkbox') as HTMLElement).setAttribute('checked', 'true');
+						(document.getElementById("button-generate-answer-points") as Button).disabled = false;
+						break;
 					}
 				}
 				break;
 			}
 			case 'benchmark done': {
-				(document.getElementById('label-reference-checkbox') as HTMLElement).textContent = 'Labeling Relevant Context References Done';
+				(document.getElementById('label-reference-checkbox') as HTMLElement).innerHTML = 'Labeling Relevant Context References Done';
 				(document.getElementById('label-reference-checkbox') as HTMLElement).setAttribute('checked', 'true');
 				(document.getElementById('label-reference-progress-ring') as HTMLElement).style.display = 'none';
 				break;
@@ -368,61 +449,4 @@ function main() {
 
 	init();
 
-	// Set checkbox indeterminate state
-	const checkbox = document.getElementById("basic-checkbox") as Checkbox;
-	checkbox.indeterminate = true;
-
-	// Define default data grid
-	const defaultDataGrid = document.getElementById("default-grid") as DataGrid;
-	defaultDataGrid.rowsData = [
-		{
-			column1: "Cell Data",
-			column2: "Cell Data",
-			column3: "Cell Data",
-			column4: "Cell Data",
-		},
-		{
-			column1: "Cell Data",
-			column2: "Cell Data",
-			column3: "Cell Data",
-			column4: "Cell Data",
-		},
-		{
-			column1: "Cell Data",
-			column2: "Cell Data",
-			column3: "Cell Data",
-			column4: "Cell Data",
-		},
-	];
-
-	// Define data grid with custom titles
-	const basicDataGridList = document.querySelectorAll(".basic-grid") as NodeListOf<DataGrid>;
-	for (const basicDataGrid of basicDataGridList) {
-		basicDataGrid.rowsData = [
-			{
-				columnKey1: "Cell Data",
-				columnKey2: "Cell Data",
-				columnKey3: "Cell Data",
-				columnKey4: "Cell Data",
-			},
-			{
-				columnKey1: "Cell Data",
-				columnKey2: "Cell Data",
-				columnKey3: "Cell Data",
-				columnKey4: "Cell Data",
-			},
-			{
-				columnKey1: "Cell Data",
-				columnKey2: "Cell Data",
-				columnKey3: "Cell Data",
-				columnKey4: "Cell Data",
-			},
-		];
-		basicDataGrid.columnDefinitions = [
-			{ columnDataKey: "columnKey1", title: "A Custom Header Title" },
-			{ columnDataKey: "columnKey2", title: "Custom Title" },
-			{ columnDataKey: "columnKey3", title: "Title Is Custom" },
-			{ columnDataKey: "columnKey4", title: "Another Custom Title" },
-		];
-	}
 }
