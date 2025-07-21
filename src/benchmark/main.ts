@@ -5,7 +5,7 @@ import * as fs from 'fs';
 
 import { shuffle } from '../utils';
 import { FileChunk, Placeholder, PlaceholderInstance, PlaceholderInstanceToString, QuestionContext, QuestionInstance, QuestionTemplate, supportedLanguages, GridType, GridStructure, GRID_STRUCTURES } from './typeDefinitions';
-import { parseFiles } from './languageAnalyser/parser';
+import { parsePlaceholderInstance } from './languageAnalyser/parser';
 import { fileFormatDateTime, LLMLogger } from '../logger';
 import { sleep } from '../utils';
 import { postMessage } from './benchmarkWebviewPanel';
@@ -142,7 +142,7 @@ async function getPlaceholderInstances(): Promise<PlaceholderInstance> {
         instances[Placeholder.Folder].push(relativePath(dirPath));
     });
 
-    Object.entries(await parseFiles(files)).forEach(([key, value]) => {
+    Object.entries(await parsePlaceholderInstance(files)).forEach(([key, value]) => {
         value.forEach(element => {
             instances[key].push(element);
         });

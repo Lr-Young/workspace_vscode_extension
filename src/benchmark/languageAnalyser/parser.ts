@@ -1,5 +1,5 @@
 
-import { FileChunk, Placeholder, PlaceholderInstance } from '../typeDefinitions';
+import { CodeEntity, FileChunk, Graph, Placeholder, PlaceholderInstance } from '../typeDefinitions';
 import { PythonCodeParser } from './pythonParser';
 import * as path from 'path';
 
@@ -36,13 +36,14 @@ export interface CodeParser {
 	readonly parser: Parser;
 	parse(filePath: string): Promise<CodeChunk[]>;
 	parsePlaceHolderInstances(filePath: string): Promise<PlaceholderInstance>;
+	buildGraph(files: string[]): Promise<Graph>;
 }
 
 export function location(node: Parser.SyntaxNode, filePath: string): string {
 	return `${workspacePath}#${path.relative(workspacePath, filePath)}#${node.startPosition.row}#${node.startPosition.column}#${node.endPosition.row}#${node.endPosition.column}#${node.text}`;
 }
 
-export async function parseFiles(files: string[]): Promise<PlaceholderInstance> {
+export async function parsePlaceholderInstance(files: string[]): Promise<PlaceholderInstance> {
 	const instances: PlaceholderInstance = {};
 
 	Object.values(Placeholder).forEach(value => {
@@ -81,4 +82,13 @@ export async function parseFiles(files: string[]): Promise<PlaceholderInstance> 
 	}
 
 	return instances;
+}
+
+export async function buildGraphs(files: string[]): Promise<Record<string, Graph>> {
+
+	const extToFiles: Record<string, string[]> = {};
+	const graphs: Record<string, Graph> = {};
+
+	
+	return graphs;
 }
