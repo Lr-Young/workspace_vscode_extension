@@ -7,7 +7,7 @@ export function getExtractRelevantFileSnippetPrompt(
 ): string {
 	const lines = fileContent.split('\n');
 	const numberedLines = lines.map((line, index) => {
-		return `${index}: ${line}`;
+		return `${index + 1}: ${line}`;
 	});
 	fileContent = numberedLines.join('\n');
 	return `

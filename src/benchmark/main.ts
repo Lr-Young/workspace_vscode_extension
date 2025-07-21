@@ -1,11 +1,12 @@
 import * as vscode from 'vscode';
 import * as fg from 'fast-glob';
 import * as path from 'path';
+import * as fs from 'fs';
 
 import { shuffle } from '../utils';
-import { FileChunk, Placeholder, PlaceholderInstance, PlaceholderInstanceToString, QuestionContext, QuestionInstance, QuestionTemplate, supportedLanguages } from './typeDefinitions';
+import { FileChunk, Placeholder, PlaceholderInstance, PlaceholderInstanceToString, QuestionContext, QuestionInstance, QuestionTemplate, supportedLanguages, GridType, GridStructure, GRID_STRUCTURES } from './typeDefinitions';
 import { parseFiles } from './languageAnalyser/parser';
-import { LLMLogger } from '../logger';
+import { fileFormatDateTime, LLMLogger } from '../logger';
 import { sleep } from '../utils';
 import { postMessage } from './benchmarkWebviewPanel';
 import { AnswerAgent, ContextAgent, PointsAgent } from './llm';
@@ -20,21 +21,21 @@ const excludePattern = [
 
 const questionTemplates: QuestionTemplate[] = [
     `What is the implementation logic of class ${Placeholder.Class}`,
-	`What is the implementation logic of function ${Placeholder.Function}`,
-	`What is the usage of class ${Placeholder.Class}`,
-	`What is the usage of function ${Placeholder.Function}`,
-	`Can directory ${Placeholder.Folder} be removed?`,
-	`Can file ${Placeholder.File} be remove?`,
-	`What is the meaning of directory ${Placeholder.Folder}?`,
-	`What is the meaning of file ${Placeholder.File}?`,
-	`What is the meaning of class ${Placeholder.Class}?`,
-	`What is the meaning of function ${Placeholder.Function}?`,
-	`What is the role of file ${Placeholder.File}?`,
-	`What is the role of class ${Placeholder.Class}?`,
-	`What is the role of directory ${Placeholder.Folder}?`,
-	`What is the role of variable ${Placeholder.Variable}?`,
+    `What is the implementation logic of function ${Placeholder.Function}`,
+    `What is the usage of class ${Placeholder.Class}`,
+    `What is the usage of function ${Placeholder.Function}`,
+    `Can directory ${Placeholder.Folder} be removed?`,
+    `Can file ${Placeholder.File} be remove?`,
+    `What is the meaning of directory ${Placeholder.Folder}?`,
+    `What is the meaning of file ${Placeholder.File}?`,
+    `What is the meaning of class ${Placeholder.Class}?`,
+    `What is the meaning of function ${Placeholder.Function}?`,
+    `What is the role of file ${Placeholder.File}?`,
+    `What is the role of class ${Placeholder.Class}?`,
+    `What is the role of directory ${Placeholder.Folder}?`,
+    `What is the role of variable ${Placeholder.Variable}?`,
 ].map(str => {
-	return new QuestionTemplate(str);
+    return new QuestionTemplate(str);
 });
 
 export let workspacePath: string = '';
@@ -43,11 +44,11 @@ export let logger: LLMLogger;
 
 function checkWorkspaceFolder(): boolean {
     if (vscode.workspace.workspaceFolders === undefined || vscode.workspace.workspaceFolders.length !== 1) {
-        vscode.window.showErrorMessage("请在工作区打开一个目录");
+        vscode.window.showErrorMessage("Please Open a directory in the Workspace");
         postMessage({
             command: 'benchmark fail',
             type: 'workspace folder not one',
-            error: '请保证工作区只有一个打开的目录'
+            error: 'Please Make Sure there is only one directory in the worksapce'
         });
         return false;
     }
@@ -69,7 +70,7 @@ export async function handleLink(type: string, value: string) {
             return;
         case 'File':
             const document = await vscode.workspace.openTextDocument(filePath);
-            await vscode.window.showTextDocument(document, {preview: false});
+            await vscode.window.showTextDocument(document, { preview: false });
             return;
         case 'Position': {
             const startRow = parseInt(splits[2]);
@@ -77,12 +78,12 @@ export async function handleLink(type: string, value: string) {
             const endRow = parseInt(splits[4]);
             const endColumn = parseInt(splits[5]);
             const doc = await vscode.workspace.openTextDocument(filePath);
-            const editor = await vscode.window.showTextDocument(doc, {preview: false});
+            const editor = await vscode.window.showTextDocument(doc, { preview: false });
             const startPosition = new vscode.Position(startRow, startColumn);
             const endPosition = new vscode.Position(endRow, endColumn);
             editor.selection = new vscode.Selection(startPosition, endPosition);
             editor.revealRange(new vscode.Range(startPosition, endPosition), vscode.TextEditorRevealType.InCenter);
-            return; 
+            return;
         }
         case 'Range': {
             const startLine: number = parseInt(splits[2]);
@@ -90,7 +91,7 @@ export async function handleLink(type: string, value: string) {
             const doc = await vscode.workspace.openTextDocument(filePath);
             const editor = await vscode.window.showTextDocument(doc);
             const startPos = new vscode.Position(startLine - 1, 0);
-            const endPos = new vscode.Position(endLine - 1, 
+            const endPos = new vscode.Position(endLine - 1,
                 doc.lineAt(endLine - 1).text.length);
             editor.selection = new vscode.Selection(startPos, endPos);
             editor.revealRange(new vscode.Range(startPos, endPos));
@@ -116,21 +117,21 @@ async function getPlaceholderInstances(): Promise<PlaceholderInstance> {
     const files = await fg.glob(
         supportedLanguages.map(ext => {
             return `**/*.${ext}`;
-        }), 
+        }),
         {
             cwd: workspacePath,
             absolute: true,
             onlyFiles: true,
             ignore: excludePattern, // 忽略node_modules
             dot: true, // 包含点文件
-    });
+        });
 
     const directories = await fg.glob('**/', {
-            cwd: workspacePath,
-            absolute: true,
-            onlyDirectories: true,
-            ignore: excludePattern,
-            dot: true
+        cwd: workspacePath,
+        absolute: true,
+        onlyDirectories: true,
+        ignore: excludePattern,
+        dot: true
     });
 
     files.forEach(filePath => {
@@ -152,34 +153,34 @@ async function getPlaceholderInstances(): Promise<PlaceholderInstance> {
 
 function instantiate(questionNum: number, placeHolderInstances: PlaceholderInstance): QuestionInstance[] {
 
-	const questions: QuestionInstance[] = [];
+    const questions: QuestionInstance[] = [];
 
-	const selectors: {
-		[key: string]: {
-			index: number,
-			instances: string[],
-		}
-	} = {};
+    const selectors: {
+        [key: string]: {
+            index: number,
+            instances: string[],
+        }
+    } = {};
 
-	let total: number = 0;
-	Object.entries(placeHolderInstances).forEach(([key, value]) => {
-		total += value.length;
-		selectors[key] = {
-			index: 0,
-			instances: shuffle([...placeHolderInstances[key]]),
-		};
-	});
+    let total: number = 0;
+    Object.entries(placeHolderInstances).forEach(([key, value]) => {
+        total += value.length;
+        selectors[key] = {
+            index: 0,
+            instances: shuffle([...placeHolderInstances[key]]),
+        };
+    });
 
-	if (total === 0) {
-		console.log("Error! place holder instance count is 0");
-		return questions;
-	}
+    if (total === 0) {
+        console.log("Error! place holder instance count is 0");
+        return questions;
+    }
 
-	let templateIndex = 0;
+    let templateIndex = 0;
 
-	while (questions.length < questionNum) {
-		const template = questionTemplates[templateIndex];
-		const selector = selectors[template.placeholder];
+    while (questions.length < questionNum) {
+        const template = questionTemplates[templateIndex];
+        const selector = selectors[template.placeholder];
         if (selector.instances.length === 0) {
             console.log(`Warning: No instances for Placeholder ${template.placeholder} `);
         } else {
@@ -196,11 +197,11 @@ function instantiate(questionNum: number, placeHolderInstances: PlaceholderInsta
                 placeholderInstance: `${selector.instances[selector.index]}`,
             });
         }
-		templateIndex = (templateIndex + 1) % questionTemplates.length;
-		selector.index = (selector.index + 1) % selector.instances.length;
-	}
+        templateIndex = (templateIndex + 1) % questionTemplates.length;
+        selector.index = (selector.index + 1) % selector.instances.length;
+    }
 
-	return questions;
+    return questions;
 }
 
 export async function instantiateQuestions(questionNum: number) {
@@ -209,7 +210,7 @@ export async function instantiateQuestions(questionNum: number) {
         return;
     }
 
-    postMessage({command: 'instantiate questions begin'});
+    postMessage({ command: 'instantiate questions begin' });
 
     const instances = await getPlaceholderInstances();
 
@@ -236,11 +237,11 @@ export async function labelRelevantContext(questions: string[]): Promise<void> {
     const agent: ContextAgent = new ContextAgent();
 
     const files = await fg.glob('**', {
-            cwd: workspacePath,
-            absolute: true,
-            onlyFiles: true,
-            ignore: excludePattern, // 忽略node_modules
-            dot: true // 包含点文件
+        cwd: workspacePath,
+        absolute: true,
+        onlyFiles: true,
+        ignore: excludePattern, // 忽略node_modules
+        dot: true // 包含点文件
     });
 
     postMessage({
@@ -266,7 +267,7 @@ export async function labelRelevantContext(questions: string[]): Promise<void> {
                 relativePath: path.relative(workspacePath, file),
                 percent: (count / files.length * 100).toFixed(2),
             });
-            const context: QuestionContext = await agent.mockInvoke(question, file, path.relative(workspacePath, file), repoName);
+            const context: QuestionContext = await agent.invoke(question, file, path.relative(workspacePath, file), repoName);
             if (context.references.length > 0) {
                 postMessage({
                     command: 'benchmark references',
@@ -333,7 +334,7 @@ export async function generateAnswerAndPoints(data: Record<string, string[]>): P
     }
 
     const answerAgent: AnswerAgent = new AnswerAgent();
-    
+
     const pointsAgent: PointsAgent = new PointsAgent();
 
     for (let i = 0; i < questions.length; i++) {
@@ -342,8 +343,8 @@ export async function generateAnswerAndPoints(data: Record<string, string[]>): P
             type: 'question',
             question: questions[i],
         });
-        const answer: string = await answerAgent.mockInvoke(questions[i], references[i], workspacePath, repoName);
-        const points: string = await pointsAgent.mockInvoke(questions[i], answer);
+        const answer: string = await answerAgent.invoke(questions[i], references[i], workspacePath, repoName);
+        const points: string = await pointsAgent.invoke(questions[i], answer);
         postMessage({
             command: 'benchmark answer',
             type: 'answer',
@@ -357,9 +358,213 @@ export async function generateAnswerAndPoints(data: Record<string, string[]>): P
         command: 'benchmark answer',
         type: 'done',
     });
-    
-    return;
 
+    return;
+}
+
+function isValidJsonData(data: any): data is Partial<Record<GridType, Record<string, string[]>>> {
+
+    const error = (msg: string): void => {
+        console.log(msg);
+    };
+
+    if (typeof data !== 'object' || data === null) {
+        error('data is not object type');
+        return false;
+    }
+
+    const validKeys: GridType[] = Object.keys(GRID_STRUCTURES) as GridType[];
+
+    const presentKeys = Object.keys(data).filter(key => validKeys.includes(key as GridType));
+    if (presentKeys.length === 0) {
+        error('data do not contain grid id keys');
+        return false;
+    }
+
+    for (const key of presentKeys) {
+        const gridKey = key as GridType;
+        const gridValue = data[gridKey];
+        const gridStructure = GRID_STRUCTURES[gridKey];
+
+        if (typeof gridValue !== 'object' || gridValue === null) {
+            error(`the data of key ${key} is not object type`);
+            return false;
+        }
+
+        const gridValueKeys = Object.keys(gridValue);
+        for (const requiredKey of gridStructure.requiredKeys) {
+            if (!gridValueKeys.includes(requiredKey)) {
+                error(`the data of key ${key} do not contain key ${requiredKey}`);
+                return false;
+            }
+        }
+
+        if (gridValueKeys.length !== gridStructure.requiredKeys.length) {
+            error(`the data of key ${key} do not contain all reuqired keys: ${gridStructure.requiredKeys.join(', ')}`);
+            return false;
+        }
+
+        let arrayLength: number | null = null;
+        for (const valueKey of gridStructure.requiredKeys) {
+            const value = gridValue[valueKey];
+
+            if (!Array.isArray(value)) {
+                error(`data[${key}][${valueKey}] is not an array`);
+                return false;
+            }
+
+            if (value.some(item => typeof item !== 'string')) {
+                error(`data[${key}][${valueKey}] is not an array of string`);
+                return false;
+            }
+
+            if (arrayLength === null) {
+                arrayLength = value.length;
+            } else if (value.length !== arrayLength) {
+                error(`data[${key}][${valueKey}] have a different array length`);
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+export async function saveJsonData(data: any) {
+
+    if (Object.keys(data).length === 0) {
+        vscode.window.showErrorMessage('No Data to Save, Please Fill Data in the Grid First');
+        postMessage({
+            command: 'save file',
+        });
+        return;
+    }
+
+    const uri = await vscode.window.showSaveDialog({
+        filters: {
+            'JSON Files': ['json']
+        }
+    });
+
+    console.log(`${uri}`);
+
+    if (uri) {
+        try {
+            await vscode.workspace.fs.writeFile(
+                uri,
+                Buffer.from(JSON.stringify(data, null, 2))
+            );
+            vscode.window.showInformationMessage('File saved successfully');
+        } catch (error) {
+            vscode.window.showErrorMessage(`Fail to save file: ${error}`);
+        }
+    }
+    postMessage({
+        command: 'save file',
+    });
+}
+
+export async function saveJsonDataDefault(data: any) {
+
+    if (!checkWorkspaceFolder()) {
+        return;
+    }
+
+    if (Object.keys(data).length === 0) {
+        vscode.window.showErrorMessage('No Data to Save, Please Fill Data in the Grid First');
+        postMessage({
+            command: 'save default file',
+        });
+        return;
+    }
+
+    const relativePath = `/.workspace_benchmark/auto_saved_benchmark_${fileFormatDateTime()}.json`;
+
+    const uri = vscode.Uri.file(path.join(workspacePath, relativePath));
+
+    try {
+        await vscode.workspace.fs.writeFile(
+            uri,
+            Buffer.from(JSON.stringify(data, null, 2))
+        );
+        vscode.window.showInformationMessage('File saved successfully');
+    } catch (error) {
+        vscode.window.showErrorMessage(`Fail to save file: ${error}`);
+    }
+    postMessage({
+        command: 'save default file',
+    });
+}
+
+export async function loadJsonData(): Promise<void> {
+
+    checkWorkspaceFolder();
+
+    const error = (msg: string) => {
+        vscode.window.showErrorMessage(msg);
+        postMessage({
+            command: 'load file',
+            type: 'fail',
+            error: msg,
+        });
+    };
+    try {
+        const fileUris = await vscode.window.showOpenDialog({
+            canSelectMany: false,
+            openLabel: 'choose a JSON file',
+            filters: {
+                'JSON File': ['json'],
+                'All Files': ['*']
+            }
+        });
+
+        if (!fileUris || fileUris.length === 0) {
+            error('Please choose a file to load data');
+            return;
+        }
+
+        const fileUri = fileUris[0];
+        const filePath = fileUri.fsPath;
+
+        if (path.extname(filePath).toLowerCase() !== '.json') {
+            error('Please choose a .json file');
+            return;
+        }
+
+        const fileContent = await fs.promises.readFile(filePath, 'utf-8');
+
+        const jsonData = JSON.parse(fileContent);
+
+        if (isValidJsonData(jsonData)) {
+            postMessage({
+                command: 'load file',
+                type: 'success',
+                data: jsonData,
+                workspacePath: workspacePath,
+            });
+        } else {
+            error('Json File data format is invalid');
+            return;
+        }
+
+        return;
+
+    } catch (e) {
+        if (e instanceof SyntaxError) {
+            error('JSON Parse Error: File Content is not JSON Format');
+        } else if (e instanceof Error) {
+            error(`Failed to read File: ${e.message}`);
+        } else {
+            error('Unknown Error');
+        }
+        return;
+    }
+}
+
+export async function auto() {
+    postMessage({
+        command: 'auto',
+    });
 }
 
 export async function constructBenchmark() {
@@ -404,5 +609,5 @@ export async function constructBenchmark() {
     // postMessage({
     //     command: 'benchmark done',
     // });
-    
+
 }

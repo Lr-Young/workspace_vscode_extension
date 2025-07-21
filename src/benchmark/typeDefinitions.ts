@@ -75,6 +75,50 @@ export type QuestionContext = {
 	reason: string,
 }
 
+export type GridType = 
+  | 'placeholder-instances-grid'
+  | 'question-instances-grid'
+  | 'question-references-grid'
+  | 'answer-point-grid';
+
+export type GridStructure = {
+  'placeholder-instances-grid': {
+    requiredKeys: ['Placeholder', 'Instances'];
+    valueType: Record<string, string[]>;
+  };
+  'question-instances-grid': {
+    requiredKeys: ['Question', 'Template', 'Placeholder Instance'];
+    valueType: Record<string, string[]>;
+  };
+  'question-references-grid': {
+    requiredKeys: ['Question', 'Reference', 'Reason'];
+    valueType: Record<string, string[]>;
+  };
+  'answer-point-grid': {
+    requiredKeys: ['Question', 'Reference', 'Answer', 'Evaluation'];
+    valueType: Record<string, string[]>;
+  };
+};
+
+export const GRID_STRUCTURES: GridStructure = {
+  'placeholder-instances-grid': {
+    requiredKeys: ['Placeholder', 'Instances'],
+    valueType: {} as Record<string, string[]>
+  },
+  'question-instances-grid': {
+    requiredKeys: ['Question', 'Template', 'Placeholder Instance'],
+    valueType: {} as Record<string, string[]>
+  },
+  'question-references-grid': {
+    requiredKeys: ['Question', 'Reference', 'Reason'],
+    valueType: {} as Record<string, string[]>
+  },
+  'answer-point-grid': {
+    requiredKeys: ['Question', 'Reference', 'Answer', 'Evaluation'],
+    valueType: {} as Record<string, string[]>
+  }
+};
+
 export const supportedLanguages: string[] = [
     'js',
     'ts',

@@ -17,7 +17,7 @@ function formatDateTime(): string {
   return `[${year}-${month}-${day} ${hours}:${minutes}:${seconds}] `;
 }
 
-function fileFormatDateTime(): string {
+export function fileFormatDateTime(): string {
     const now = new Date();
     
     // 格式化为 YYYY-MM-DD_HH-MM-SS

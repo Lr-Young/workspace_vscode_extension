@@ -49,11 +49,15 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
     <h1>Workspace Benchmark Dataset</h1>
     <vscode-divider role="separator"></vscode-divider>
 
-    <div class="vertical">
-        <p>Choose Question Instances JSON File</p>
-        <input type="file" id="question-instances-file-input" accept=".json"/>
-        <vscode-button appearance="primary" id="button-instantiate-questions-file">Load Question Instances from a JSON File</vscode-button>
-    </div>
+    <h2>Save to or Load from File </h2>
+
+    <vscode-button appearance="primary" id="button-load-file">Load from File</vscode-button>
+
+    <vscode-button appearance="primary" id="button-save-file">Save to File</vscode-button>
+
+    <vscode-button appearance="primary" id="button-save-default-file">Save</vscode-button>
+
+    <vscode-button appearance="primary" id="button-auto">Auto</vscode-button>
 
     <vscode-divider role="separator"></vscode-divider>
 

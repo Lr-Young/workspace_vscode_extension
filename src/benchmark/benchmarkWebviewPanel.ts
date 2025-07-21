@@ -1,6 +1,6 @@
 import { Disposable, Uri, Webview, WebviewPanel, window, ViewColumn } from "vscode";
 import { getWebviewContent } from "../gui/benchmark";
-import { constructBenchmark, generateAnswerAndPoints, instantiateQuestions, labelRelevantContext } from "../benchmark/main";
+import { auto, constructBenchmark, generateAnswerAndPoints, instantiateQuestions, labelRelevantContext, loadJsonData, saveJsonData, saveJsonDataDefault } from "../benchmark/main";
 import { handleLink } from './main';
 
 import { testLLM } from './llm';
@@ -49,6 +49,18 @@ export class BenchmarkWebviewPanel {
 					case 'testButton':
 						const msg = await testLLM();
 						window.showInformationMessage(msg as string);
+						return;
+					case 'load file':
+						await loadJsonData();
+						return;
+					case 'save file':
+						await saveJsonData(message.data);
+						return;
+					case 'save default file':
+						await saveJsonDataDefault(message.data);
+						return;
+					case 'auto':
+						await auto();
 						return;
 				}
 			}
