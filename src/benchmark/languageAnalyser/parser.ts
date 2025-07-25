@@ -36,11 +36,39 @@ export interface CodeParser {
 	readonly parser: Parser;
 	parse(filePath: string): Promise<CodeChunk[]>;
 	parsePlaceHolderInstances(filePath: string): Promise<PlaceholderInstance>;
-	buildGraph(files: string[]): Promise<Graph>;
+	buildGraph(files: string[]): Graph;
 }
 
 export function location(node: Parser.SyntaxNode, filePath: string): string {
 	return `${workspacePath}#${path.relative(workspacePath, filePath)}#${node.startPosition.row}#${node.startPosition.column}#${node.endPosition.row}#${node.endPosition.column}#${node.text}`;
+}
+
+export function dotsToPath(dotString: string, baseDir?: string): string {
+	const parts = dotString.split('.');
+
+	// 处理开头的点（相对路径）
+	let relativeLevel = -1;
+	while (parts[0] === '') {
+		relativeLevel++;
+		parts.shift();
+	}
+
+	if (relativeLevel === -1) {
+		relativeLevel = 0;
+	}
+
+	// 构建相对路径部分
+	const relativePrefix = '../'.repeat(relativeLevel);
+
+	// 组合路径
+	let fullPath = path.join(relativePrefix, ...parts);
+
+	// 如果有基础目录，则解析为绝对路径
+	if (baseDir) {
+		fullPath = path.resolve(baseDir, fullPath);
+	}
+
+	return fullPath;
 }
 
 export async function parsePlaceholderInstance(files: string[]): Promise<PlaceholderInstance> {
@@ -84,10 +112,34 @@ export async function parsePlaceholderInstance(files: string[]): Promise<Placeho
 	return instances;
 }
 
-export async function buildGraphs(files: string[]): Promise<Record<string, Graph>> {
+export function buildGraphs(files: string[]): Record<string, Graph> {
 
 	const extToFiles: Record<string, string[]> = {};
 	const graphs: Record<string, Graph> = {};
+
+	for (const filePath of files) {
+		const ext = path.extname(filePath);
+
+		switch (ext) {
+			case '.py': {
+				if (!(ext in extToFiles)) {
+					extToFiles[ext] = [];
+				}
+				extToFiles[ext].push(filePath);
+			}
+		}
+	}
+
+	Object.entries(extToFiles).forEach(([ext, fileList]) => {
+		switch (ext) {
+			case '.py': {
+				if (extToParser[ext] === undefined) {
+					extToParser[ext] = new PythonCodeParser();
+				}
+				graphs[ext] = extToParser[ext].buildGraph(fileList);
+			}
+		}
+	});
 
 	
 	return graphs;

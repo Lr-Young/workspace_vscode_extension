@@ -4,8 +4,8 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 import { shuffle } from '../utils';
-import { FileChunk, Placeholder, PlaceholderInstance, PlaceholderInstanceToString, QuestionContext, QuestionInstance, QuestionTemplate, supportedLanguages, GridType, GridStructure, GRID_STRUCTURES } from './typeDefinitions';
-import { parsePlaceholderInstance } from './languageAnalyser/parser';
+import { FileChunk, Graph, Placeholder, PlaceholderInstance, PlaceholderInstanceToString, QuestionContext, QuestionInstance, QuestionTemplate, supportedLanguages, GridType, GridStructure, GRID_STRUCTURES } from './typeDefinitions';
+import { buildGraphs, parsePlaceholderInstance } from './languageAnalyser/parser';
 import { fileFormatDateTime, LLMLogger } from '../logger';
 import { sleep } from '../utils';
 import { postMessage } from './benchmarkWebviewPanel';
@@ -234,6 +234,12 @@ export async function labelRelevantContext(questions: string[]): Promise<void> {
         return;
     }
 
+    postMessage({
+        command: 'benchmark references',
+        type: 'init',
+        questions: questions,
+    });
+
     const agent: ContextAgent = new ContextAgent();
 
     const files = await fg.glob('**', {
@@ -244,11 +250,8 @@ export async function labelRelevantContext(questions: string[]): Promise<void> {
         dot: true // 包含点文件
     });
 
-    postMessage({
-        command: 'benchmark references',
-        type: 'init',
-        questions: questions,
-    });
+    const graphs: Record<string, Graph> = buildGraphs(files);
+
 
     for (const question of questions) {
         postMessage({
@@ -267,7 +270,7 @@ export async function labelRelevantContext(questions: string[]): Promise<void> {
                 relativePath: path.relative(workspacePath, file),
                 percent: (count / files.length * 100).toFixed(2),
             });
-            const context: QuestionContext = await agent.invoke(question, file, path.relative(workspacePath, file), repoName);
+            const context: QuestionContext = await agent.mockInvoke(question, file, path.relative(workspacePath, file), repoName);
             if (context.references.length > 0) {
                 postMessage({
                     command: 'benchmark references',
@@ -343,8 +346,8 @@ export async function generateAnswerAndPoints(data: Record<string, string[]>): P
             type: 'question',
             question: questions[i],
         });
-        const answer: string = await answerAgent.invoke(questions[i], references[i], workspacePath, repoName);
-        const points: string = await pointsAgent.invoke(questions[i], answer);
+        const answer: string = await answerAgent.mockInvoke(questions[i], references[i], workspacePath, repoName);
+        const points: string = await pointsAgent.mockInvoke(questions[i], answer);
         postMessage({
             command: 'benchmark answer',
             type: 'answer',

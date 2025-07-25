@@ -214,7 +214,58 @@ export type CodeEntity = {
 	usedBy: string[];
 }
 
+function escapePathForJsonKey(path: string): string {
+  return path.replace(/\\/g, '\\\\');
+}
+
+export function codeEntityTotString(codeEntity: CodeEntity, identSize: number=0): string {
+	const indent = ' '.repeat(identSize);
+	let ret=  `
+{
+	"fqn": "${codeEntity.fqn}",
+	"type": "${codeEntity.type}",
+	"content": "${escapePathForJsonKey(codeEntity.content.relativePath)}: ${codeEntity.content.startLine}~${codeEntity.content.endLine}",
+	"use": [${codeEntity.use.map(e => {return `"${e}"`;}).join(', ')}],
+	"usedBy": [${codeEntity.usedBy.join(', ')}]
+}
+	`.trim();
+
+	ret = ret.split('\n').map(e => {
+		return `${indent}${e}`;
+	}).join('\n');
+
+	return ret;
+}
+
 export type Graph = {
 	fileNodes: Record<string, string[]>;
 	nodes: Record<string, CodeEntity>;
+	fileImportNodes: Record<string, Set<string>>;
+}
+
+export function graphToString(graph: Graph): string {
+	let ret= `
+{
+	"nodes":
+	{
+${Object.entries(graph.nodes).map(([fqn, codeEntity]) => {
+	return `${' '.repeat(8)}"${fqn}":\n${codeEntityTotString(codeEntity, 8)}`;
+}).join(',\n')}
+	},
+	"fileNodes": 
+	{
+${Object.entries(graph.fileNodes).map(([file, fqns]) => {
+	return `${' '.repeat(8)}"${escapePathForJsonKey(file)}": [${fqns.map(e => {return `"${e}"`;}).join(', ')}]`;
+}).join(',\n')}
+	},
+	"fileImportNode":
+	{
+${Object.entries(graph.fileImportNodes).map(([file, fqns]) => {
+	return `${' '.repeat(8)}"${escapePathForJsonKey(file)}": [${[...fqns].map(e => {return `"${e}"`;}).join(', ')}]`;
+}).join(',\n')}
+	}
+}
+	`.trim();
+
+	return `${ret}\n`;
 }

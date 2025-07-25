@@ -27,3 +27,11 @@ export function shuffle<T>(array: T[]): T[] {
 export async function sleep(ms: number): Promise<void> {
 	return new Promise(resolve => setTimeout(resolve, ms));
 }
+
+export function pathToDots(path: string): string {
+	return path
+		.replace(/^[\/\\]+/, '')    // 移除开头的分隔符
+		.replace(/[\/\\]+$/, '')    // 移除结尾的分隔符
+		.replace(/[\/\\]+/g, '.');  // 替换中间的分隔符
+}
+
