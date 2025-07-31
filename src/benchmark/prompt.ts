@@ -12,7 +12,7 @@ export function getExtractRelevantFileSnippetPrompt(
 	fileContent = numberedLines.join('\n');
 	return `
 You are an experienced code comprehension expert.  
-Your job is to find **all** contiguous spans of code or text in a single file that are necessary to answer a code comprehension question about the code base named \`${repoName}\`.  
+Your job is to find **all** contiguous spans of code or text in following file content that are necessary to answer a code comprehension question about the code base named \`${repoName}\`.  
 
 —— INPUT ——
 Code Comprehension Question:

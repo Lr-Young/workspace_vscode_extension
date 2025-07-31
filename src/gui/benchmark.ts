@@ -24,6 +24,7 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
 	const webviewUri = getUri(webview, extensionUri, "out", "webview.js");
 	const styleUri = getUri(webview, extensionUri, "out", "style.css");
 	const codiconUri = getUri(webview, extensionUri, "out", "codicon.css");
+    const d3Src = getUri(webview, extensionUri, "out", "d3.v7.min.js");
 	const nonce = getNonce();
 
 	// Note: Since the below HTML is defined within a JavaScript template literal, all of
@@ -42,6 +43,26 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
     <link rel="stylesheet" href="${styleUri}">
     <link rel="stylesheet" href="${codiconUri}">
     <title>Workspace Benchmark</title>
+    <script nonce="${nonce}" src="${d3Src}"></script>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        svg { width: 100%; height: 100vh; }
+        .node { stroke: #fff; stroke-width: 1.5px; }
+        .node.class { fill: #66c2a5; }
+        .node.utility { fill: #fc8d62; }
+        .link { stroke: #999; stroke-opacity: 0.6; }
+        .link.inheritance { stroke-dasharray: 5,5; }
+        #tooltip {
+            position: absolute;
+            padding: 8px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            border-radius: 4px;
+            pointer-events: none;
+            font-family: sans-serif;
+            font-size: 12px;
+        }
+    </style>
 </head>
 
 <body>
@@ -60,6 +81,9 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
     <vscode-button appearance="primary" id="button-auto">Auto</vscode-button>
 
     <vscode-divider role="separator"></vscode-divider>
+
+    <svg></svg>
+    <div id="tooltip" style="display: none;"></div>
 
     <section class="component-container">
 

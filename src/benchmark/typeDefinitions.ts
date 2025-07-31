@@ -243,6 +243,30 @@ export type Graph = {
 	fileImportNodes: Record<string, Set<string>>;
 }
 
+export function mergeGraph(graphs: Graph[]): Graph {
+	const merged: Graph = {
+		fileNodes: {},
+		nodes: {},
+		fileImportNodes: {}
+	};
+
+	graphs.forEach(graph => {
+		Object.entries(graph.nodes).forEach(([fqn, codeEntity]) => {
+			merged.nodes[fqn] = codeEntity;
+		});
+
+		Object.entries(graph.fileNodes).forEach(([file, fqns]) => {
+			merged.fileNodes[file] = fqns;
+		});
+
+		Object.entries(graph.fileImportNodes).forEach(([file, nodes]) => {
+			merged.fileImportNodes[file] = nodes;
+		});
+	});
+
+	return merged;
+}
+
 export function graphToString(graph: Graph): string {
 	let ret= `
 {
@@ -268,4 +292,66 @@ ${Object.entries(graph.fileImportNodes).map(([file, fqns]) => {
 	`.trim();
 
 	return `${ret}\n`;
+}
+
+export type D3Node = {
+    id: string;
+    name: string;
+    file: string;
+	type: 'file' | 'code entity',
+    startLine?: number;
+	endLine?: number;
+    x?: number;
+    y?: number;
+    fx?: number | null;
+    fy?: number | null;
+};
+
+export type D3Link = {
+    source: string | D3Node;
+    target: string | D3Node;
+};
+
+export type D3Graph = {
+    nodes: D3Node[];
+    links: D3Link[];
+};
+
+export function graphToD3Graph(graph: Graph): D3Graph {
+	const d3Graph: D3Graph = {
+		nodes: [],
+		links: [],
+	};
+
+	Object.entries(graph.nodes).forEach(([fqn, codeEntity]) => {
+		d3Graph.nodes.push({
+			id: fqn,
+			name: fqn,
+			file: codeEntity.content.relativePath,
+			type: 'code entity',
+			startLine: codeEntity.content.startLine,
+			endLine: codeEntity.content.endLine,
+		});
+	});
+
+	Object.entries(graph.fileNodes).forEach(([file, _]) => {
+		d3Graph.nodes.push({
+			id: file,
+			name: file,
+			file: file,
+			type: 'file',
+		});
+	});
+
+	Object.entries(graph.fileImportNodes).forEach(([file, nodes]) => {
+		[...nodes].forEach(node => {
+			d3Graph.links.push({
+				source: file,
+				target: node
+			});
+		});
+	});
+
+
+	return d3Graph;
 }

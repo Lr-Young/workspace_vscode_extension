@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 import { shuffle } from '../utils';
-import { FileChunk, Graph, Placeholder, PlaceholderInstance, PlaceholderInstanceToString, QuestionContext, QuestionInstance, QuestionTemplate, supportedLanguages, GridType, GridStructure, GRID_STRUCTURES } from './typeDefinitions';
+import { FileChunk, Graph, graphToD3Graph, mergeGraph, Placeholder, PlaceholderInstance, PlaceholderInstanceToString, QuestionContext, QuestionInstance, QuestionTemplate, supportedLanguages, GridType, GridStructure, GRID_STRUCTURES, D3Graph } from './typeDefinitions';
 import { buildGraphs, parsePlaceholderInstance } from './languageAnalyser/parser';
 import { fileFormatDateTime, LLMLogger } from '../logger';
 import { sleep } from '../utils';
@@ -62,8 +62,10 @@ function checkWorkspaceFolder(): boolean {
 }
 
 export async function handleLink(type: string, value: string) {
+    console.log(`handle link: ${type} ${value}`);
     const splits: string[] = value.split('#');
-    const filePath: string = `${splits[0]}${splits[1]}`;
+    // const filePath: string = `${splits[0]}${splits[1]}`;
+    const filePath: string = path.join(splits[0], splits[1]);
     switch (type) {
         case 'Folder':
             await vscode.commands.executeCommand('revealInExplorer', vscode.Uri.file(filePath));
@@ -252,6 +254,15 @@ export async function labelRelevantContext(questions: string[]): Promise<void> {
 
     const graphs: Record<string, Graph> = buildGraphs(files);
 
+    const mergedGraph: Graph = mergeGraph([...Object.values(graphs)]);
+
+    const d3Graph: D3Graph = graphToD3Graph(mergedGraph);
+
+    postMessage({
+        command: 'd3 graph',
+        data: d3Graph,
+        workspacePath: workspacePath,
+    });
 
     for (const question of questions) {
         postMessage({

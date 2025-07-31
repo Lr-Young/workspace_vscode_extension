@@ -6,8 +6,10 @@ import {
 	Button,
 } from "@vscode/webview-ui-toolkit";
 
+import * as d3 from "d3" ;
+
 import { dataLoaders } from "../gui/components";
-import { FileChunk, Placeholder, PlaceholderInstance, QuestionInstance } from "../benchmark/typeDefinitions";
+import { FileChunk, D3Link, D3Node, D3Graph, Placeholder, PlaceholderInstance, QuestionInstance } from "../benchmark/typeDefinitions";
 import { sleep } from '../utils';
 
 const vscode = acquireVsCodeApi();
@@ -644,9 +646,12 @@ function init() {
 				(document.getElementById("button-save-default-file") as Button).disabled = false;
 				break;
 			}
-			case 'benchmark fail':{
+			case 'benchmark fail': {
 				console.log(`benchmark fail, type: ${message.type} error: ${message.error}`);
 				break;
+			}
+			case 'd3 graph': {
+				renderD3Graph(message.data, message.workspacePath);
 			}
 		}
 	});
@@ -655,5 +660,257 @@ function init() {
 function main() {
 
 	init();
+}
+
+function getNodeShape(d: D3Node, selection: d3.Selection<SVGElement, D3Node, SVGGElement, unknown>) {
+    const group = selection.append('g')
+        .attr('class', `node-shape ${d.type}`)
+        .attr('transform', `translate(${d.x},${d.y})`);
+    
+    // 根据类型创建不同形状
+    switch(d.type) {
+        case 'code entity': // 圆形
+            group.append('circle')
+                .attr('r', 15)
+                .attr('fill', '#1a73e8')
+                .attr('stroke', '#0d47a1')
+                .attr('stroke-width', 2);
+            break;
+            
+        case 'file': // 矩形
+			console.log(`file node: ${d.id}`);
+            group.append('rect')
+                .attr('width', 30)
+                .attr('height', 20)
+                .attr('x', -15)
+                .attr('y', -10)
+                .attr('rx', 5)
+                .attr('ry', 5)
+                .attr('fill', '#1a73e8')
+                .attr('stroke', '#0d47a1')
+                .attr('stroke-width', 2);
+            break;
+
+        default: // 默认圆形
+            group.append('circle')
+                .attr('r', 15)
+                .attr('fill', '#999')
+                .attr('stroke', '#666')
+                .attr('stroke-width', 2);
+    }
+    
+    return group;
+}
+
+// 主函数
+function renderD3Graph(graphData: D3Graph, workspacePath: string) {
+    const svg = d3.select<SVGSVGElement, unknown>("svg")
+		.style('width', '100%')
+		.style('height', '100%')
+		.style('min-height', '900px');
+    const width = svg.node()!.getBoundingClientRect().width;
+    const height = svg.node()!.getBoundingClientRect().height;
+    const tooltip = d3.select("#tooltip");
+
+    // 1. 初始化缩放和平移
+    const zoom = d3.zoom<SVGSVGElement, unknown>()
+        .scaleExtent([0.1, 10])
+        .on("zoom", (event: d3.D3ZoomEvent<SVGSVGElement, unknown>) => {
+            g.attr("transform", event.transform.toString());
+        });
+
+    svg.call(zoom);
+
+    const g = svg.append("g");
+
+    // 2. 创建力导向模拟
+    const simulation = d3.forceSimulation<D3Node, D3Link>(graphData.nodes)
+        .force("link", d3.forceLink<D3Node, D3Link>(graphData.links)
+            .id(d => d.id)
+            .distance(100)
+        )
+        .force("charge", d3.forceManyBody<D3Node>().strength(-1000))
+        .force("center", d3.forceCenter(width / 2, height / 2))
+        .force("collision", d3.forceCollide<D3Node>().radius(30));
+
+    // 4. 绘制连线（取消箭头）
+	const link = g.append("g")
+		.selectAll("line")
+		.data(graphData.links)
+		.join("line")
+		// 移除以下属性：
+		// .attr("marker-end", "url(#arrow)")
+		// 添加以下样式属性：
+		.attr("stroke", d => {return '#2ca02c';})
+		.attr("stroke-width", 2)
+		.attr("stroke-opacity", 0.8);
+
+    // 5. 绘制节点
+
+	const nodeGroups = g.append("g")
+		.selectAll("g.node-container")
+		.data(graphData.nodes)
+		.join("g")
+		.attr("class", "node-container")
+		.call(getDragBehavior(simulation) as any)
+		.on("click", (event: MouseEvent, d: D3Node) => {
+            if (d.file) {
+				if (d.type === 'file') {
+					vscode.postMessage({
+						command: 'link',
+						type: 'File',
+						value: `${workspacePath}#${d.file}`,
+					});
+				} else if (d.type === 'code entity') {
+					vscode.postMessage({
+						command: 'link',
+						type: 'Range',
+						value: `${workspacePath}#${d.file}#${d.startLine}#${d.endLine}`,
+					});
+				}
+            }
+        })
+		.on("mouseover", (event: MouseEvent, d: D3Node) => {
+			tooltip.style("display", null)
+				.html(`<strong>${d.name}</strong><br>Type: ${d.type}`)
+				.style("left", `${event.pageX + 10}px`)
+				.style("top", `${event.pageY + 10}px`);
+			d3.select(event.currentTarget as SVGGElement)
+				.select('.node-shape')
+				.select('*')
+				.attr('fill', '#4285f4');
+		})
+		.on("mouseout", () => {
+			tooltip.style("display", "none");
+			nodeGroups.select('.node-shape')
+				.select('*')
+				.attr('fill', (d: D3Node) => {
+					switch(d.type) {
+						case 'code entity': return '#1a73e8';
+						case 'file': return '#1a73e8';
+						default: return '#999';
+					}
+				});
+		});
+
+	// 为每个节点创建形状
+	nodeGroups.each(function(d) {
+		getNodeShape(d, d3.select(this) as any);
+	});
+
+    // 6. 添加节点标签（白色文字）
+	const labels = g.append("g")
+		.selectAll("text")
+		.data(graphData.nodes)
+		.join("text")
+		.text(d => d.name)
+		.attr("font-size", 12)
+		.attr("fill", "white") // 白色文字
+		.attr("dx", d => {
+			// 根据不同类型调整标签位置
+			switch(d.type) {
+				case 'code entity': return 20; // 圆形
+				case 'file': return 18; // 矩形
+				default: return 20;
+			}
+		})
+		.attr("dy", 5)
+		.style("text-shadow", "1px 1px 2px rgba(0,0,0,0.5)"); // 添加阴影增强可读性
+
+	function getEdgePoint(node: D3Node, target: D3Node) {
+		const dx = target.x! - node.x!;
+		const dy = target.y! - node.y!;
+		const distance = Math.sqrt(dx * dx + dy * dy);
+		
+		if (node.type === 'file') {
+			// 矩形边缘交点计算
+			const ratio = Math.min(
+				Math.abs(15 / (dx / distance)),
+				Math.abs(10 / (dy / distance))
+			);
+			return {
+				x: node.x! + (dx / distance) * ratio,
+				y: node.y! + (dy / distance) * ratio
+			};
+		} else {
+			// 圆形边缘交点
+			return {
+				x: node.x! + (dx / distance) * 15,
+				y: node.y! + (dy / distance) * 15
+			};
+		}
+	}
+
+    // 7. 更新模拟tick事件
+	simulation.on("tick", () => {
+		link
+			.attr("x1", d => getEdgePoint(d.source as D3Node, d.target as D3Node).x)
+			.attr("y1", d => getEdgePoint(d.source as D3Node, d.target as D3Node).y)
+			.attr("x2", d => getEdgePoint(d.target as D3Node, d.source as D3Node).x)
+			.attr("y2", d => getEdgePoint(d.target as D3Node, d.source as D3Node).y);
+
+		// 更新节点组位置
+		nodeGroups
+			.attr("transform", d => `translate(${d.x},${d.y})`);
+
+		// 更新标签位置
+		labels
+			.attr("x", d => d.x!)
+			.attr("y", d => d.y!);
+	});
+
+    // 8. 初始自动缩放适配
+    setTimeout(zoomToFit, 100);
+
+    function zoomToFit() {
+        const bounds = (svg.node() as SVGSVGElement).getBBox();
+        const parent = svg.node()!.parentElement as HTMLElement;
+        const fullWidth = parent.clientWidth;
+        const fullHeight = parent.clientHeight;
+        
+        const width = bounds.width;
+        const height = bounds.height;
+        const midX = bounds.x + width / 2;
+        const midY = bounds.y + height / 2;
+        
+        const scale = 0.9 / Math.max(width / fullWidth, height / fullHeight);
+        
+        svg.transition()
+            .duration(750)
+            .call(
+                zoom.transform as any, 
+                d3.zoomIdentity
+                    .translate(fullWidth / 2, fullHeight / 2)
+                    .scale(scale)
+                    .translate(-midX, -midY)
+            );
+    }
+
+    // 更新拖拽行为的类型定义
+	type NodeSelection = d3.Selection<SVGGElement, D3Node, SVGGElement, unknown>;
+
+	function getDragBehavior(
+		simulation: d3.Simulation<D3Node, D3Link>
+	): (selection: NodeSelection) => void {
+		const dragBehavior = d3.drag<SVGGElement, D3Node, D3Node>()
+			.on("start", (event: d3.D3DragEvent<SVGGElement, D3Node, D3Node>, d: D3Node) => {
+				if (!event.active) simulation.alphaTarget(0.3).restart();
+				d.fx = d.x;
+				d.fy = d.y;
+			})
+			.on("drag", (event: d3.D3DragEvent<SVGGElement, D3Node, D3Node>, d: D3Node) => {
+				d.fx = event.x;
+				d.fy = event.y;
+			})
+			.on("end", (event: d3.D3DragEvent<SVGGElement, D3Node, D3Node>, d: D3Node) => {
+				if (!event.active) simulation.alphaTarget(0);
+				d.fx = null;
+				d.fy = null;
+			});
+
+		return (selection: NodeSelection) => {
+			selection.call(dragBehavior as any);
+		};
+	}
 
 }
