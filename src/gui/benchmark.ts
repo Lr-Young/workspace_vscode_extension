@@ -43,6 +43,7 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
     <link rel="stylesheet" href="${styleUri}">
     <link rel="stylesheet" href="${codiconUri}">
     <title>Workspace Benchmark</title>
+    <!--
     <script nonce="${nonce}" src="${d3Src}"></script>
     <style>
         body { margin: 0; overflow: hidden; }
@@ -63,6 +64,7 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
             font-size: 12px;
         }
     </style>
+    -->
 </head>
 
 <body>
@@ -82,8 +84,10 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
 
     <vscode-divider role="separator"></vscode-divider>
 
+    <!--
     <svg></svg>
     <div id="tooltip" style="display: none;"></div>
+    -->
 
     <section class="component-container">
 

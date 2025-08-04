@@ -1,60 +1,86 @@
+import { escapePathForJsonKey } from './typeDefinitions';
+
+function addLineNumber(content: string, startLine: number=0): string {
+	const lines = content.split('\n');
+	const numberedLines = lines.map((line, index) => {
+		return `${startLine + index + 1}: ${line}`;
+	});
+	return numberedLines.join('\n');
+}
 
 export function getExtractRelevantFileSnippetPrompt(
 	question: string,
-	filePath: string,
+	relativePathWithRepoName: string,
 	fileContent: string,
 	repoName: string,
+	dependentCode: {
+		relativePathWithRepoName: string,
+		fileContent: string,
+		startLine: number, 
+	}[],
 ): string {
-	const lines = fileContent.split('\n');
-	const numberedLines = lines.map((line, index) => {
-		return `${index + 1}: ${line}`;
-	});
-	fileContent = numberedLines.join('\n');
 	return `
-You are an experienced code comprehension expert.  
-Your job is to find **all** contiguous spans of code or text in following file content that are necessary to answer a code comprehension question about the code base named \`${repoName}\`.  
+You are an experienced code comprehension expert.   
+Your job is to find **all** contiguous spans of code or text in the main file or its directly imported dependent code files(may not exist) that are necessary to answer a code comprehension question about the code base named \`${repoName}\`. 
 
 —— INPUT ——
 Code Comprehension Question:
 <question>
-${question.trim()}”
+${question}
 </question>
 
 File Path:
 <file-path>
-“${filePath.trim()}”
+${escapePathForJsonKey(relativePathWithRepoName)}
 </file-path>
 
 File Content (with line numbers):
 <file-content>
-${fileContent.trim()}
+${addLineNumber(fileContent)}
 </file-content>
 
+Dependent File Content (with line numbers):
+${ dependentCode.length === 0 ? 'No dependent file' :
+dependentCode.map(d => {
+	return `
+File: <file-path>${escapePathForJsonKey(d.relativePathWithRepoName)}</file-path>
+<file-content>
+${addLineNumber(d.fileContent, d.startLine)}
+</file-content>
+`.trim();
+}).join('\n')}
+
 —— INSTRUCTIONS ——
-1. Read the **Question** carefully; identify its key target(s) (e.g. function, variable, module identifiers etc.).  
-2. Think step by step to scan the **File content** and locate every contiguous block of lines that contains information **relevant** to answering the question.  
-   - **Include** definitions, calls, comments, documentation, configuration or any code that helps answer the question.  
-   - **Exclude** unrelated code that is not helpful to answer the question.  
-3. For each relevant block, record the **smallest** start and end line numbers that still capture the full context.  
-4. If the file contains **no relevant information**, return an empty list.  
-5. Ouput your chain of thought process and explanation first, then return your answer **exactly** as a JSON array of objects, each with \`start\` and \`end\` fields.
+1. Read the **Question** carefully and identify its key targets (e.g., function names, variable names, module names, etc.).  
+2. Scan the **File Content** and all provided **Dependent File Content** snippets to locate every contiguous block of lines that contain information relevant to answering the question.  
+   - **Include** definitions, calls, comments, documentation, configuration, or any code necessary for context.  
+   - **Exclude** any unrelated code.  
+   - **Assume** that each dependent file snippet contains all relevant lines needed (they may be truncated to relevant portions).  
+   - **Do not** search beyond the provided snippets (only consider the main file and its direct imports as given).  
+3. For each relevant block, record the **smallest** start and end line numbers in the **specific file** that capture the full context.  
+4. If no relevant information is found in any of the provided files, return an empty list.  
+5. Output your chain-of-thought reasoning first, then return the answer **exactly** as a JSON array of objects, each with \`filename\`, \`start\`, and \`end\` fields.
 
 —— OUTPUT FORMAT ——
 [Analysis]
-<Your chain-of-thought goes here.>
-
-[Answer]
-<Here goes the JSON array.>
-
-### Example
-[Analysis]  
-I see that \`functionA\` is declared on lines 12-17 and its comment above on lines 10-11 explains its purpose. I also see that \`functionA\` is called on lines 35 in \`functionB\` definition on line 30-45. There are two other function definitions in this file, but they are not relevant to the question.
+<Your reasoning about identifying relevant code spans across files.>
 
 [Answer]
 [
-  { "start": 10, "end": 17 },
-  { "start": 30, "end": 45 }
+  { "filename": "<file-name>", "start": <line>, "end": <line> },
+  ...
 ]
+
+### Example
+[Analysis]  
+In \`main.py\`, I see that \`funcA\` is imported on lines 1-2 and called on lines 5-6. In \`a.py\`, \`funcA\` is defined on lines 1-2. In \`dir/b.py\`, \`funcB\` is defined on lines 4-5. The question is about functions \`funcA\` and \`funcB\`, so I include their definitions and calls.  
+[Answer]
+[
+  { "filename": "main.py", "start": 1, "end": 6 },
+  { "filename": "a.py",    "start": 1, "end": 2 },
+  { "filename": "dir/b.py","start": 4, "end": 5 }
+]
+
 `.trim();
 }
 
@@ -62,8 +88,9 @@ export function getGenerateAnswerPrompt(
 	question: string,
 	repoName: string,
 	references: {
-		relativePath: string,
+		relativePathWithRepoName: string,
 		content: string,
+		startLine: number,
 		language: string,
 	}[],
 ) {
@@ -82,7 +109,12 @@ ${question}
 
 Relevant Code Snippets From The Codebase:
 ${references.map(reference => {
-	return `**File Path**: ${reference.relativePath}\n\`\`\`${reference.language}\n${reference.content.trim()}\n\`\`\`\n`;
+	return `
+**File Path**: ${reference.relativePathWithRepoName}
+\`\`\`${reference.language}
+${addLineNumber(reference.content, reference.startLine)}
+\`\`\`
+`.trim();
 }).join('\n')}
 
 

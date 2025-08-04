@@ -9,7 +9,6 @@ import { workspacePath } from '../main';
 
 import Parser = require('tree-sitter');
 import Python = require('tree-sitter-python');
-import { chdir } from 'process';
 
 let DEBUG = false;
 
@@ -273,8 +272,6 @@ export class PythonCodeParser implements CodeParser {
 				leadingDotCount++;
 			}
 
-			console.log(`leading dot count is: ${leadingDotCount}`);
-
 			if (leadingDotCount === 0) {
 				importedFile = path.join(dotsToPath(moduleName), '__init__.py');
 				let found = false;
@@ -306,8 +303,6 @@ export class PythonCodeParser implements CodeParser {
 					importedFile = path.join(importedFile, '__init__.py');
 				}
 			}
-
-			console.log(`	import file: ${importedFile}`);
 
 			const isInitFile: boolean = path.basename(fileRelativePath) === '__init__.py';
 			const importIsInitFile: boolean = path.basename(importedFile) === '__init__.py';
@@ -1118,19 +1113,12 @@ export class PythonCodeParser implements CodeParser {
 			
 			handleModule(tree.rootNode);
 
-			console.log(`\nparsing ${filePath}`);
-			Object.entries(importedIdentifiers).forEach(([k, v]) => {
-				console.log(`    ${k}: ${v}`);
-			});
-
 		}
 
 		for (const filePath of files) {
 			if (path.basename(filePath) === '__init__.py') {
 				continue;
 			}
-
-			console.log(`\nparsing ${filePath}`);
 
 			Object.keys(importedIdentifiers).forEach(key => {
 				delete importedIdentifiers[key];
@@ -1141,7 +1129,7 @@ export class PythonCodeParser implements CodeParser {
 			const tree = this.parser.parse(content);
 
 			if (path.basename(fileRelativePath) === 'edit_tool.py') {
-				DEBUG = true;
+				DEBUG = false;
 			}
 			
 			handleModule(tree.rootNode);
@@ -1149,10 +1137,6 @@ export class PythonCodeParser implements CodeParser {
 			if (path.basename(fileRelativePath) === 'edit_tool.py') {
 				DEBUG = false;
 			}
-
-			Object.entries(importedIdentifiers).forEach(([k, v]) => {
-				console.log(`    ${k}: ${v}`);
-			});
 			
 		}
 	}

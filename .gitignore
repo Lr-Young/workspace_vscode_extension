@@ -6,3 +6,4 @@ node_modules
 /localTS
 .env
 .VSCodeCounter/
+*.zip

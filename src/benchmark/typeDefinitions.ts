@@ -61,6 +61,43 @@ export type FileChunk = {
 	readonly endLine: number;
 }
 
+export function mergeFileChunks(chunks: FileChunk[]): FileChunk[] {
+
+    const groupedByPath = new Map<string, FileChunk[]>();
+    for (const chunk of chunks) {
+        if (!groupedByPath.has(chunk.relativePath)) {
+            groupedByPath.set(chunk.relativePath, []);
+        }
+        groupedByPath.get(chunk.relativePath)!.push(chunk);
+    }
+
+    const result: FileChunk[] = [];
+    for (const [path, pathChunks] of groupedByPath) {
+        const sorted = [...pathChunks].sort((a, b) => a.startLine - b.startLine);
+        
+        let current = sorted[0];
+        
+        for (let i = 1; i < sorted.length; i++) {
+            const next = sorted[i];
+            
+            if (current.endLine >= next.startLine) {
+                current = {
+                    relativePath: path,
+                    startLine: Math.min(current.startLine, next.startLine),
+                    endLine: Math.max(current.endLine, next.endLine)
+                };
+            } else {
+                result.push(current);
+                current = next;
+            }
+        }
+        
+        result.push(current);
+    }
+    
+    return result;
+}
+
 export type Instance = {
 	readonly repo: string;
 	readonly question: string;
@@ -214,7 +251,7 @@ export type CodeEntity = {
 	usedBy: string[];
 }
 
-function escapePathForJsonKey(path: string): string {
+export function escapePathForJsonKey(path: string): string {
   return path.replace(/\\/g, '\\\\');
 }
 
@@ -292,66 +329,4 @@ ${Object.entries(graph.fileImportNodes).map(([file, fqns]) => {
 	`.trim();
 
 	return `${ret}\n`;
-}
-
-export type D3Node = {
-    id: string;
-    name: string;
-    file: string;
-	type: 'file' | 'code entity',
-    startLine?: number;
-	endLine?: number;
-    x?: number;
-    y?: number;
-    fx?: number | null;
-    fy?: number | null;
-};
-
-export type D3Link = {
-    source: string | D3Node;
-    target: string | D3Node;
-};
-
-export type D3Graph = {
-    nodes: D3Node[];
-    links: D3Link[];
-};
-
-export function graphToD3Graph(graph: Graph): D3Graph {
-	const d3Graph: D3Graph = {
-		nodes: [],
-		links: [],
-	};
-
-	Object.entries(graph.nodes).forEach(([fqn, codeEntity]) => {
-		d3Graph.nodes.push({
-			id: fqn,
-			name: fqn,
-			file: codeEntity.content.relativePath,
-			type: 'code entity',
-			startLine: codeEntity.content.startLine,
-			endLine: codeEntity.content.endLine,
-		});
-	});
-
-	Object.entries(graph.fileNodes).forEach(([file, _]) => {
-		d3Graph.nodes.push({
-			id: file,
-			name: file,
-			file: file,
-			type: 'file',
-		});
-	});
-
-	Object.entries(graph.fileImportNodes).forEach(([file, nodes]) => {
-		[...nodes].forEach(node => {
-			d3Graph.links.push({
-				source: file,
-				target: node
-			});
-		});
-	});
-
-
-	return d3Graph;
 }

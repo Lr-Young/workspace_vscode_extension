@@ -1,71 +1,110 @@
-# workspace README
+# Workspace Benchmark VS Code 扩展
 
-This is the README for your extension "workspace". After writing up a brief description, we recommend including the following sections.
+代码仓库理解类问题的问答基准测试集
 
-## Features
+## 功能特性
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+### 代码库基准测试
+- 自动生成关于代码库的问题
+- 标记代码上下文相关性
+- 生成问题答案和评分
+- 支持文件、文件夹和代码位置的快速导航
+- 可视化数据展示
 
-For example if there is an image subfolder under your extension project workspace:
+## 安装
 
-\!\[feature X\]\(images/feature-x.png\)
+1. 克隆此仓库
+2. 在VS Code中打开文件夹
+3. 运行 `npm install` 安装依赖
+4. 按F5运行扩展开发宿主环境
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+## 使用方法
 
-## Requirements
+### 基准测试
+1. 打开命令面板 (Ctrl+Shift+P)
+2. 运行 "Workspace Benchmark" 命令
+3. 在打开的面板中:
+   - 点击"Construct Benchmark"构建基准测试
+   - 设置问题数量并生成问题
+   - 标记相关上下文
+   - 生成答案和评分
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+## 项目结构
 
-## Extension Settings
+```
+├── .gitignore
+├── .vscode-test.mjs
+├── .vscode/
+├── .vscodeignore
+├── CHANGELOG.md
+├── README.md
+├── esbuild.js
+├── eslint.config.mjs
+├── media/
+│   └── icon.svg
+├── package-lock.json
+├── package.json
+├── src/
+│   ├── benchmark/
+│   │   ├── benchmarkWebviewPanel.ts
+│   │   ├── languageAnalyser/
+│   │   ├── llm.ts
+│   │   ├── main.ts
+│   │   ├── prompt.ts
+│   │   └── typeDefinitions.ts
+│   ├── extension.ts
+│   ├── gui/
+│   │   ├── benchmark.ts
+│   │   ├── components.ts
+│   │   └── demos/
+│   ├── logger.ts
+│   ├── test/
+│   ├── utils.ts
+│   └── webview/
+│       ├── codicon.css
+│       ├── codicon.ttf
+│       ├── main.ts
+│       └── style.css
+├── tsconfig.json
+└── vsc-extension-quickstart.md
+```
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+## 关键文件说明
 
-For example:
+- `src/extension.ts`: 扩展的入口文件，注册命令和视图
+- `src/benchmark/benchmarkWebviewPanel.ts`: 基准测试Webview面板实现
+- `src/benchmark/main.ts`: 基准测试核心逻辑
+- `src/webview/main.ts`: Webview交互逻辑
+- `src/webview/style.css`: Webview样式
 
-This extension contributes the following settings:
+## 配置
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+扩展需要设置以下环境变量:
+- `DEEPSEEK_API_KEY`: DeepSeek API密钥，用于LLM模型访问
 
-## Known Issues
+## 依赖
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+主要依赖包括:
+- `@vscode/webview-ui-toolkit`: VS Code Webview UI工具包
+- `@langchain/community`: LangChain社区版
+- `@langchain/deepseek`: DeepSeek LLM集成
+- `tree-sitter`: 代码解析
 
-## Release Notes
+## 已知问题
 
-Users appreciate release notes as you update your extension.
+- 基准测试功能在大型代码库上可能运行缓慢
+- 需要配置API密钥
 
-### 1.0.0
+## 版本历史
 
-Initial release of ...
+### 0.0.1
+- 初始版本
+- 实现测试集生成功能
 
-### 1.0.1
+## 贡献
 
-Fixed issue #.
+欢迎提交问题和拉取请求！
 
-### 1.1.0
+## 许可证
 
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+[MIT](LICENSE)

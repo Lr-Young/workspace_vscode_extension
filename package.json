@@ -45,7 +45,7 @@
   "scripts": {
     "vscode:prepublish": "npm run package",
     "compile": "node ./esbuild.js",
-    "package": "NODE_ENV=production node ./esbuild.js",
+    "package": "cross-env NODE_ENV=production node ./esbuild.js",
     "watch": "node ./esbuild.js",
     "lint": "eslint src --ext ts"
   },
@@ -59,6 +59,7 @@
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
     "@vscode/webview-ui-toolkit": "^1.4.0",
+    "cross-env": "^10.0.0",
     "esbuild": "^0.16.10",
     "esbuild-plugin-copy": "^2.0.1",
     "eslint": "^9.21.0",
@@ -70,10 +71,8 @@
     "@langchain/community": "^0.3.47",
     "@langchain/core": "^0.3.61",
     "@langchain/deepseek": "^0.0.2",
-    "@types/d3": "^7.4.3",
     "@types/vscode-webview": "^1.57.5",
     "@vscode/webview-ui-toolkit": "^1.2.2",
-    "d3": "^7.9.0",
     "fast-glob": "^3.3.3",
     "langchain": "^0.3.29",
     "reflect-metadata": "^0.2.2",
