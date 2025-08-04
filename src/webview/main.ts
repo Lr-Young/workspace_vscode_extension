@@ -551,6 +551,14 @@ function init() {
 						(document.getElementById('reference-progress-wrapper') as HTMLElement).style.display = 'block';
 						break;
 					}
+					case 'build graphs': {
+						(document.getElementById('reference-checkbox') as HTMLElement).innerHTML = `Building Graphs...`;
+						break;
+					}
+					case 'build graphs doneS': {
+						(document.getElementById('reference-checkbox') as HTMLElement).innerHTML = `Building Graphs Done`;
+						break;
+					}
 					case 'question': {
 						contextGridRowIndex += 1;
 						contextGridRowReasonVscodeLinkCount = 0;

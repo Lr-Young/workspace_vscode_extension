@@ -613,6 +613,9 @@ export class PythonCodeParser implements CodeParser {
 				return;
 			}
 			debug(`handleRaiseStatement`, node);
+			if (node.namedChildCount === 0) {
+				return;
+			}
 			handleValue(node.namedChildren[0]);
 		}
 
@@ -1104,6 +1107,10 @@ export class PythonCodeParser implements CodeParser {
 				continue;
 			}
 
+			if (DEBUG) {
+				console.log(`Processing __init__.py: ${filePath}`);
+			}
+
 			Object.keys(importedIdentifiers).forEach(key => {
 				delete importedIdentifiers[key];
 			});
@@ -1120,6 +1127,10 @@ export class PythonCodeParser implements CodeParser {
 				continue;
 			}
 
+			if (DEBUG) {
+				console.log(`Processing file: ${filePath}`);
+			}
+
 			Object.keys(importedIdentifiers).forEach(key => {
 				delete importedIdentifiers[key];
 			});
@@ -1127,16 +1138,8 @@ export class PythonCodeParser implements CodeParser {
 			fileRelativePath = path.relative(workspacePath, filePath);
 			const content = fs.readFileSync(filePath, 'utf8');
 			const tree = this.parser.parse(content);
-
-			if (path.basename(fileRelativePath) === 'edit_tool.py') {
-				DEBUG = false;
-			}
 			
 			handleModule(tree.rootNode);
-
-			if (path.basename(fileRelativePath) === 'edit_tool.py') {
-				DEBUG = false;
-			}
 			
 		}
 	}

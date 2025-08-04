@@ -1,9 +1,14 @@
 import * as vscode from 'vscode';
 import { BenchmarkWebviewPanel } from './benchmark/benchmarkWebviewPanel';
 
-console.log(`set env: ${process.env.DEEPSEEK_API_KEY}`);
-
 export function activate(context: vscode.ExtensionContext) {
+
+	console.log(`set env: ${process.env.DEEPSEEK_API_KEY}`);
+
+	if (!process.env.DEEPSEEK_API_KEY) {
+		vscode.window.showErrorMessage('DEEPSEEK_API_KEY environment variable is not setPlease set it in your environment variables.');
+		return;
+	}
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('workspace.helloWorld', () => {

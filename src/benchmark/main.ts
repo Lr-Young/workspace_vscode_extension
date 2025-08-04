@@ -252,9 +252,19 @@ export async function labelRelevantContext(questions: string[]): Promise<void> {
         dot: true // 包含点文件
     });
 
+    postMessage( {
+        command: 'benchmark references',
+        type: 'build graphs',
+    });
+
     const graphs: Record<string, Graph> = buildGraphs(files);
 
     const mergedGraph: Graph = mergeGraph([...Object.values(graphs)]);
+
+    postMessage({
+        command: 'benchmark references',
+        type: 'build graphs done',
+    });
 
     let references: FileChunk[] = [];
 

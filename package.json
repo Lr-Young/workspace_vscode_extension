@@ -1,7 +1,8 @@
 {
-  "name": "workspace",
-  "displayName": "workspace",
+  "name": "workspace-benchmark",
+  "displayName": "Workspace Benchmark",
   "description": "workspace extension",
+  "publisher": "lryoung",
   "version": "0.0.1",
   "repository": {
     "type": "git",
@@ -80,7 +81,6 @@
     "fast-glob": "^3.3.3",
     "langchain": "^0.3.29",
     "reflect-metadata": "^0.2.2",
-    "sqlite3": "^5.1.7",
     "tree-sitter": "^0.22.4",
     "tree-sitter-python": "^0.23.6",
     "typeorm": "^0.3.25"
