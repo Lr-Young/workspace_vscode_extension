@@ -583,10 +583,13 @@ function init() {
 
 						await updateGridCell('question-references-grid', contextGridRowIndex, 1, references);
 						await updateGridCell('answer-point-grid', contextGridRowIndex, 1, references);
-						await appendGridCell('question-references-grid', contextGridRowIndex, 2, 
-							`<vscode-link class="question-context-link-${contextGridRowIndex}" data-type="File" data-value="${message.workspacePath}#${relatviePath}">${relatviePath}</vscode-link> Reason:<br>${message.reason}`
-						);
-						contextGridRowReasonVscodeLinkCount += 1;
+						let resonMsg = '';
+						message.references.forEach((reference: FileChunk) => {
+							contextGridRowReasonVscodeLinkCount += 1;
+							resonMsg += `<vscode-link class="question-context-link-${contextGridRowIndex}" data-type="File" data-value="${message.workspacePath}#${reference.relativePath}">${reference.relativePath}</vscode-link><br>`;
+						});
+						resonMsg += `Reason: ${message.reason}`;
+						await appendGridCell('question-references-grid', contextGridRowIndex, 2, resonMsg);
 						addLinkEventListener(`vscode-link.question-context-link-${contextGridRowIndex}`, contextGridRowReasonVscodeLinkCount + 2 * (message.updatedReferences as FileChunk[]).length);
 						break;
 					}

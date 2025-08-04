@@ -266,9 +266,8 @@ export async function labelRelevantContext(questions: string[]): Promise<void> {
         type: 'build graphs done',
     });
 
-    let references: FileChunk[] = [];
-
     for (const question of questions) {
+        let references: FileChunk[] = [];
         postMessage({
             command: 'benchmark references',
             type: 'question',
@@ -292,6 +291,7 @@ export async function labelRelevantContext(questions: string[]): Promise<void> {
                     command: 'benchmark references',
                     type: 'references',
                     updatedReferences: references,
+                    references: context.references,
                     reason: context.reason,
                     workspacePath: workspacePath,
                 });
