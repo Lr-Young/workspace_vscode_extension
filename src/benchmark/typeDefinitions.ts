@@ -63,39 +63,38 @@ export type FileChunk = {
 
 export function mergeFileChunks(chunks: FileChunk[]): FileChunk[] {
 
-    const groupedByPath = new Map<string, FileChunk[]>();
-    for (const chunk of chunks) {
-        if (!groupedByPath.has(chunk.relativePath)) {
-            groupedByPath.set(chunk.relativePath, []);
-        }
-        groupedByPath.get(chunk.relativePath)!.push(chunk);
-    }
+	const gap = 3; // Allow a gap of 3 lines to merge chunks
 
-    const result: FileChunk[] = [];
-    for (const [path, pathChunks] of groupedByPath) {
-        const sorted = [...pathChunks].sort((a, b) => a.startLine - b.startLine);
-        
-        let current = sorted[0];
-        
-        for (let i = 1; i < sorted.length; i++) {
-            const next = sorted[i];
-            
-            if (current.endLine >= next.startLine) {
-                current = {
-                    relativePath: path,
-                    startLine: Math.min(current.startLine, next.startLine),
-                    endLine: Math.max(current.endLine, next.endLine)
-                };
-            } else {
-                result.push(current);
-                current = next;
-            }
-        }
-        
-        result.push(current);
-    }
-    
-    return result;
+	const groupedByPath = new Map<string, FileChunk[]>();
+	for (const chunk of chunks) {
+		if (!groupedByPath.has(chunk.relativePath)) {
+			groupedByPath.set(chunk.relativePath, []);
+		}
+		groupedByPath.get(chunk.relativePath)!.push(chunk);
+	}
+
+	const result: FileChunk[] = [];
+	for (const [path, pathChunks] of groupedByPath) {
+		const sorted = [...pathChunks].sort((a, b) => a.startLine - b.startLine);
+		if (sorted.length === 0) { continue; }
+		let current = sorted[0];
+		for (let i = 1; i < sorted.length; i++) {
+			const next = sorted[i];
+			if (current.endLine + gap >= next.startLine) {
+				current = {
+					relativePath: path,
+					startLine: Math.min(current.startLine, next.startLine),
+					endLine: Math.max(current.endLine, next.endLine)
+				};
+			} else {
+				result.push(current);
+				current = next;
+			}
+		}
+		result.push(current);
+	}
+	
+	return result;
 }
 
 export type Instance = {

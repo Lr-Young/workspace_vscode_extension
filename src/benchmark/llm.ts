@@ -246,23 +246,31 @@ export class ContextAgent {
 
         const relativePath: string = path.relative(workspacePath, absoluteFilePath);
 
-        context.references.push({
-            relativePath: relativePath,
-            startLine: 1,
-            endLine: halfLine,
-        });
+        if (totalLines <= 20) {
+            context.references.push({
+                relativePath: relativePath,
+                startLine: 1,
+                endLine: totalLines,
+            });
+        } else {
+            context.references.push({
+                relativePath: relativePath,
+                startLine: 1,
+                endLine: halfLine,
+            });
 
-        context.references.push({
-            relativePath: relativePath,
-            startLine: halfLine,
-            endLine: halfLine,
-        });
+            context.references.push({
+                relativePath: relativePath,
+                startLine: halfLine + 2,
+                endLine: halfLine + 2,
+            });
 
-        context.references.push({
-            relativePath: relativePath,
-            startLine: halfLine,
-            endLine: totalLines,
-        });
+            context.references.push({
+                relativePath: relativePath,
+                startLine: halfLine + 6,
+                endLine: totalLines,
+            });
+        }
 
         context.reason = 'Mock Reason';
 
