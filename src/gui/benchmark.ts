@@ -69,19 +69,19 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
 
 <body>
 
+    <div class="navbar">
+        <vscode-button appearance="primary" id="button-load-file">Load from File</vscode-button>
+
+        <vscode-button appearance="primary" id="button-save-file">Save to File</vscode-button>
+
+        <vscode-button appearance="primary" id="button-save-default-file">Save</vscode-button>
+
+        <vscode-button appearance="primary" id="button-auto">Auto</vscode-button>
+
+        <vscode-button appearance="primary" id="button-modify-references">Modify References</vscode-button>
+    </div>
+
     <h1>Workspace Benchmark Dataset</h1>
-    <vscode-divider role="separator"></vscode-divider>
-
-    <h2>Save to or Load from File </h2>
-
-    <vscode-button appearance="primary" id="button-load-file">Load from File</vscode-button>
-
-    <vscode-button appearance="primary" id="button-save-file">Save to File</vscode-button>
-
-    <vscode-button appearance="primary" id="button-save-default-file">Save</vscode-button>
-
-    <vscode-button appearance="primary" id="button-auto">Auto</vscode-button>
-
     <vscode-divider role="separator"></vscode-divider>
 
     <!--
@@ -118,11 +118,8 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
         <h2>Step 2: Label Question Context Instantiation</h2>
 
         <vscode-checkbox readonly id="reference-checkbox">Label Question References</vscode-checkbox>
-        <div class="progress-container hidden" id="reference-progress-wrapper">
-            <div class="progress-bar" id="reference-progress-bar">0%</div>
-        </div>
 
-        <vscode-button disabled title="Please Finish Step 1" appearance="primary" id="button-label-reference">Label References</vscode-button>
+        <vscode-button title="Please Finish Step 1" appearance="primary" id="button-label-reference">Label References</vscode-button>
         
         <vscode-data-grid class="hidden" id="question-references-grid" grid-template-columns="1fr 1fr 2fr"></vscode-data-grid>
 
@@ -140,7 +137,7 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
             </div>
         </div>
 
-        <vscode-button disabled title="Please Finish Step 2" appearance="primary" id="button-generate-answer-points">genreate Answer and Points</vscode-button>
+        <vscode-button title="Please Finish Step 2" appearance="primary" id="button-generate-answer-points">genreate Answer and Points</vscode-button>
         
         <vscode-data-grid class="hidden" id="answer-point-grid" grid-template-columns="1fr 1fr 2fr"></vscode-data-grid>
 

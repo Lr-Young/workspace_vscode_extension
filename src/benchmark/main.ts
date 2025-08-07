@@ -3,7 +3,7 @@ import * as fg from 'fast-glob';
 import * as path from 'path';
 import * as fs from 'fs';
 
-import { shuffle } from '../utils';
+import { concurrencyRun, shuffle } from '../utils';
 import { FileChunk, Graph, mergeGraph, mergeFileChunks, Placeholder, PlaceholderInstance, QuestionContext, QuestionInstance, QuestionTemplate, supportedLanguages, GridType, GRID_STRUCTURES } from './typeDefinitions';
 import { buildGraphs, parsePlaceholderInstance } from './languageAnalyser/parser';
 import { fileFormatDateTime, LLMLogger } from '../logger';
@@ -62,7 +62,6 @@ function checkWorkspaceFolder(): boolean {
 }
 
 export async function handleLink(type: string, value: string) {
-    console.log(`handle link: ${type} ${value}`);
     const splits: string[] = value.split('#');
     // const filePath: string = `${splits[0]}${splits[1]}`;
     const filePath: string = path.join(splits[0], splits[1]);
@@ -100,6 +99,58 @@ export async function handleLink(type: string, value: string) {
         }
 
     }
+}
+
+function isValidReference(reference: string): {
+    success: boolean,
+    relativeFilePath?: string,
+    startLine?: number,
+    endLine?: number
+} {
+    const splits1 = reference.split(':');
+    if (splits1.length !== 2) {
+        return {success: false};
+    }
+    const splits2 = splits1[1].split('~');
+    if (splits2.length !== 2) {
+        return {success: false};
+    }
+    const filePath = path.join(workspacePath, splits1[0]);
+    if (!fs.existsSync(filePath)) {
+        return {success: false};
+    }
+    const stat = fs.statSync(filePath);
+    if (!stat.isFile()) {
+        return {success: false};
+    }
+    const startLine: number = parseInt(splits2[0]);
+    const endLine: number = parseInt(splits2[1]);
+    if (isNaN(startLine) || isNaN(endLine) || startLine < 1 || endLine < startLine || startLine > endLine) {
+        return {success: false};
+    }
+
+    const fileContent: string = fs.readFileSync(filePath, 'utf-8');
+    const lineCount = fileContent.split(/\r?\n/).length;
+    if (endLine > lineCount) {
+        return {success: false};
+    }
+
+    return {success: true, relativeFilePath: path.relative(workspacePath, filePath), startLine, endLine};
+}
+
+export function checkReference(reference: string, rowIndex: number): void {
+    const checkResult = isValidReference(reference);
+    if (!checkResult.success) {
+        vscode.window.showErrorMessage(`The Reference ${reference} is Invalid\nReference Format: <file_path>:<start_line>~<end_line> and the File Exists in the Workspace`);
+        return;
+    }
+    postMessage({
+        command: 'add reference',
+        workspacePath: workspacePath,
+        rowIndex: rowIndex,
+        rawReference: reference,
+        ...checkResult,
+    });
 }
 
 async function getPlaceholderInstances(): Promise<PlaceholderInstance> {
@@ -242,6 +293,8 @@ export async function labelRelevantContext(questions: string[]): Promise<void> {
         questions: questions,
     });
 
+    const questionCount = questions.length;
+
     const agent: ContextAgent = new ContextAgent();
 
     const files = await fg.glob('**', {
@@ -266,38 +319,54 @@ export async function labelRelevantContext(questions: string[]): Promise<void> {
         type: 'build graphs done',
     });
 
-    for (const question of questions) {
-        let references: FileChunk[] = [];
+    const tasks: (() => Promise<void>)[] = [];
+
+    for (let i = 0; i < questionCount; i++) {
+        const question: string = questions[i];
         postMessage({
             command: 'benchmark references',
             type: 'question',
-            question: question,
+            index: i,
         });
-        let count: number = 0;
-        for (const file of files) {
-            count += 1;
-            postMessage({
-                command: 'benchmark references',
-                type: 'analyse file',
-                question: question,
-                workspacePath: workspacePath,
-                relativePath: path.relative(workspacePath, file),
-                percent: (count / files.length * 100).toFixed(2),
-            });
-            const context: QuestionContext = await agent.invoke(question, file, repoName, mergedGraph);
-            references = mergeFileChunks([...references, ...context.references]);
-            if (context.references.length > 0) {
+        tasks.push(async () => {
+            let references: FileChunk[] = [];
+            let count: number = 0;
+            for (const file of files) {
                 postMessage({
                     command: 'benchmark references',
-                    type: 'references',
-                    updatedReferences: references,
-                    references: context.references,
-                    reason: context.reason,
+                    type: 'analyse file',
+                    index: i,
                     workspacePath: workspacePath,
+                    relativePath: path.relative(workspacePath, file),
+                    percent: (count / files.length * 100).toFixed(2),
                 });
+                const context: QuestionContext = await agent.invoke(question, file, repoName, mergedGraph);
+                references = mergeFileChunks([...references, ...context.references]);
+                if (context.references.length > 0) {
+                    postMessage({
+                        command: 'benchmark references',
+                        type: 'references',
+                        index: i,
+                        updatedReferences: references,
+                        references: context.references,
+                        reason: context.reason,
+                        workspacePath: workspacePath,
+                    });
+                }
+                count += 1;
             }
-        }
+            postMessage({
+                command: 'benchmark references',
+                type: 'question done',
+                index: i,
+                question: question,
+                references: references,
+            });
+        });
     }
+
+    await concurrencyRun(tasks, 5);
+
     postMessage({
         command: 'benchmark references',
         type: 'done',

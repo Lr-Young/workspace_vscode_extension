@@ -134,7 +134,8 @@ export class ContextAgent {
 
     constructor() {
         this.model = new ChatDeepSeek({
-            model: 'deepseek-chat',
+            // model: 'deepseek-chat',
+            model: 'deepseek-reasoner',
             temperature: 0,
         });
 
@@ -171,6 +172,11 @@ export class ContextAgent {
             references: [],
             reason: '',
         };
+
+        if (path.basename(absoluteFilePath) !== 'trae_agent.py') {
+            context.reason = 'File is not a Python file';
+            return context;
+        }
 
         const content: string = readFileSync(absoluteFilePath, 'utf8');
 
@@ -225,7 +231,11 @@ export class ContextAgent {
 
     async mockInvoke(question: string, absoluteFilePath: string, repoName: string, graph: Graph): Promise<QuestionContext> {
         
-        await sleep(200);
+        // generate a random timeout to simulate the delay of LLM invocation
+
+        const randomTimeout: number = Math.floor(Math.random() * 40) + 10; // between 10ms and 50ms
+
+        await sleep(randomTimeout);
 
         const context: QuestionContext = {
             question: question,

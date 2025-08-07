@@ -7,14 +7,14 @@ import {
 } from "@vscode/webview-ui-toolkit";
 
 import { dataLoaders } from "../gui/components";
-import { FileChunk, Placeholder, PlaceholderInstance, QuestionInstance } from "../benchmark/typeDefinitions";
+import { FileChunk, mergeFileChunks, Placeholder, PlaceholderInstance, QuestionInstance } from "../benchmark/typeDefinitions";
 import { sleep } from '../utils';
 
 const vscode = acquireVsCodeApi();
-let contextGridRowIndex: number = -1;
-let contextGridRowReasonVscodeLinkCount: number;
+let contextGridRowReasonVscodeLinkCount: number[] = [];
 let answerGridRowIndex: number = -1;
 let auto: boolean = false;
+let modifying: boolean = false;
 
 // In order to use all the Webview UI Toolkit web components they
 // must be registered with the browser (i.e. webview) using the
@@ -54,9 +54,10 @@ function validateGridData(data: Record<string, string>[]): boolean {
 }
 
 async function addLinkEventListener(selector: string, expectedCount: number) {
+	let retryCount = 10;
 	do {
 		await sleep(200);
-	} while (document.querySelectorAll(`${selector}`).length !== expectedCount);
+	} while (document.querySelectorAll(`${selector}`).length !== expectedCount && retryCount-- > 0);
 	document.querySelectorAll(`${selector}`).forEach(link => {
 		link.addEventListener('click', () => {
 			vscode.postMessage({
@@ -68,7 +69,7 @@ async function addLinkEventListener(selector: string, expectedCount: number) {
 	});
 };
 
-async function appendGridCell(id: string, rowIndex: number, columnIndex: number, content: string): Promise<void> {
+function appendGridCell(id: string, rowIndex: number, columnIndex: number, content: string): void {
 	const grid = document.getElementById(id) as DataGrid;
 
 	const rows = grid.querySelectorAll('vscode-data-grid-row[row-type="default"]');
@@ -97,7 +98,7 @@ async function appendGridCell(id: string, rowIndex: number, columnIndex: number,
 	return;
 }
 
-async function updateGridCell(id: string, rowIndex: number, columnIndex: number, content: string): Promise<void> {
+function updateGridCell(id: string, rowIndex: number, columnIndex: number, content: string): void {
 	const grid = document.getElementById(id) as DataGrid;
 
 	const rows = grid.querySelectorAll('vscode-data-grid-row[row-type="default"]');
@@ -185,7 +186,7 @@ async function fillGrid(id: string, data: Record<string, string[]> | Record<stri
 
 }
 
-async function loadDataFromGrid(id: string): Promise<Record<string, string[]>> {
+function loadDataFromGrid(id: string): Record<string, string[]> {
 	const data: Record<string, string[]> = {};
 
 	const grid = document.getElementById(id) as DataGrid;
@@ -207,7 +208,6 @@ async function loadDataFromGrid(id: string): Promise<Record<string, string[]>> {
 	for (let i = 0; i < rows.length; i++) {
 		const row = rows[i];
 		const cells = row.querySelectorAll('vscode-data-grid-cell');
-		const rowData: Record<string, string> = {};
 		for (let j = 0; j < cells.length; j++) {
 			data[titles[j]].push(cells[j].innerHTML);
 		}
@@ -258,6 +258,161 @@ function modifyVscodeLinkDataValue(data: Record<string, string[]>, titles: strin
 	return output;
 }
 
+async function registerOnclickEvent(rowIndex: number, vscodeLinkCount: number): Promise<void> {
+	for (let index = 0; index < vscodeLinkCount; index++) {
+		const acceptCheckbox = document.getElementById(`checkbox-accept-${rowIndex}-${index}`);
+		const rejectCheckbox = document.getElementById(`checkbox-reject-${rowIndex}-${index}`);
+		while (!acceptCheckbox || !rejectCheckbox) {
+			await sleep(100);
+		}
+		acceptCheckbox.addEventListener('click', () => {
+			acceptCheckbox.classList.add('checked');
+			acceptCheckbox.textContent = '✔';
+			rejectCheckbox.classList.remove('checked');
+			rejectCheckbox.textContent = '';
+		});
+		rejectCheckbox.addEventListener('click', () => {
+			rejectCheckbox.classList.add('checked');
+			rejectCheckbox.textContent = '✖';
+			acceptCheckbox.classList.remove('checked');
+			acceptCheckbox.textContent = '';
+		});
+	}
+
+	(document.getElementById(`button-add-reference-${rowIndex}`) as Button).onclick = async (event) => {
+		const input = document.getElementById(`input-add-reference-${rowIndex}`) as HTMLInputElement;
+		const newReference = input.value.trim();
+		if (newReference.length === 0) {
+			vscode.postMessage({
+				command: 'error',
+				message: 'New reference cannot be empty',
+			});
+			return;
+		}
+		vscode.postMessage({
+			command: 'check reference',
+			reference: newReference,
+			rowIndex: rowIndex
+		});
+	};
+}
+
+async function addVscodeLinkCheckOption(): Promise<boolean> {
+
+	const data: Record<string, string[]> = loadDataFromGrid('question-references-grid');
+
+	if (!('Reason' in data)) {
+		return false;
+	}
+
+	data['Reference'].forEach(async (value: string, rowIndex: number) => {
+		const vscodeLinks = value.split('<br>');
+		const updatedReferences: string[] = vscodeLinks.map((vslink: string, index: number) => {
+			return `
+${vslink}<br>
+<div class="selector">
+  <div class="option">
+    <div id="checkbox-accept-${rowIndex}-${index}" class="checkbox accept checked">✔</div>
+    Accept
+  </div>
+
+  <div class="option">
+    <div id="checkbox-reject-${rowIndex}-${index}" class="checkbox reject"></div>
+    Reject
+  </div>
+</div>
+`.trim();
+		});
+
+		updatedReferences.push(`
+<div class="horizontal">
+	<vscode-text-area placeholder="add new reference" id="input-add-reference-${rowIndex}"></vscode-text-area>
+	<vscode-button appearance="primary" id="button-add-reference-${rowIndex}">Add Reference</vscode-button>
+</div>
+			`.trim());
+
+		updateGridCell('question-references-grid', rowIndex, 1, updatedReferences.join('<br>'));
+		await addLinkEventListener(`.question-context-link-${rowIndex}`, vscodeLinks.length);
+		registerOnclickEvent(rowIndex, vscodeLinks.length);
+	});
+
+	return true;
+}
+
+function removeVscodeLinkCheckOption(): void {
+
+	function mergeVscodeLinks(links: string[], rowIndex: number): string[] {
+		const mergedLinks: string[] = [];
+		const fileChunks: FileChunk[] = [];
+		let workspacePath: string = '';
+
+		links.forEach((link: string) => {
+			const tmpElement = document.createElement('div');
+			tmpElement.innerHTML = link;
+			const vscodeLink = (tmpElement.querySelector('vscode-link') as HTMLElement);
+			if (vscodeLink && vscodeLink.dataset.value) {
+				const [wp, relativeFilePath, startLine, endLine] = vscodeLink.dataset.value.split('#');
+				if (workspacePath === '') {
+					workspacePath = wp;
+				}
+				fileChunks.push({
+					relativePath: relativeFilePath,
+					startLine: parseInt(startLine),
+					endLine: parseInt(endLine),
+				});
+			}
+		});
+		
+		mergeFileChunks(fileChunks).forEach((chunk: FileChunk) => {
+			mergedLinks.push(`<vscode-link class="question-context-link-${rowIndex}" data-type="Range" data-value="${workspacePath}#${chunk.relativePath}#${chunk.startLine}#${chunk.endLine}">${chunk.relativePath}:${chunk.startLine}~${chunk.endLine}</vscode-link>`);
+		});
+
+		return mergedLinks;
+	}
+
+	const data: Record<string, string[]> = loadDataFromGrid('question-references-grid');
+	data['Reference'].forEach(async (value: string, rowIndex: number) => {
+		const elements = value.split('<br>').slice(0, -1);
+		const acceptedReferences: string[] = [];
+		for (let i = 0; i < elements.length; i += 2) {
+			const tmpElement = document.createElement('div');
+			tmpElement.innerHTML = elements[i + 1];
+			const checkbox = tmpElement.querySelector('.checkbox.accept') as HTMLElement;
+			if (checkbox && checkbox.classList.contains('checked')) {
+				acceptedReferences.push(elements[i]);
+			}
+		}
+
+		updateGridCell('question-references-grid', rowIndex, 1, mergeVscodeLinks(acceptedReferences, rowIndex).join('<br>'));
+		updateGridCell('answer-point-grid', rowIndex, 1, mergeVscodeLinks(acceptedReferences, rowIndex).join('<br>'));
+		await addLinkEventListener(`.question-context-link-${rowIndex}`, acceptedReferences.length);
+	});
+}
+
+async function addReference(rowIndex: number, rawReference: string, workspacePath: string, relativeFilePath: string, startLine: number, endLine: number): Promise<void> {
+	const data: Record<string, string[]> = loadDataFromGrid('question-references-grid');
+	const splits: string[] = data['Reference'][rowIndex].split('<br>');
+	const vscodeLinkCount = (splits.length - 1) / 2;
+	const vscodeLink = `
+<vscode-link class="question-context-link-${rowIndex}" data-type="Range" data-value="${workspacePath}#${relativeFilePath}#${startLine}#${endLine}">${rawReference}</vscode-link><br>
+<div class="selector">
+  <div class="option">
+    <div id="checkbox-accept-${rowIndex}-${vscodeLinkCount}" class="checkbox accept checked">✔</div>
+    Accept
+  </div>
+
+  <div class="option">
+    <div id="checkbox-reject-${rowIndex}-${vscodeLinkCount}" class="checkbox reject"></div>
+    Reject
+  </div>
+</div>
+`.trim();
+	
+	updateGridCell('question-references-grid', rowIndex, 1, splits.slice(0, -1).join('<br>') + `<br>${vscodeLink}` + '<br>' + splits[splits.length - 1]);
+	await addLinkEventListener(`.question-context-link-${rowIndex}`, vscodeLinkCount + 1);
+	registerOnclickEvent(rowIndex, vscodeLinkCount + 1);
+}
+
 async function gridDataToJson(): Promise<Record<string, Record<string, string[]>>> {
 	const data: Record<string, Record<string, string[]>> = {};
 
@@ -269,7 +424,7 @@ async function gridDataToJson(): Promise<Record<string, Record<string, string[]>
 	];
 
 	for (const id of gridIds) {
-		const gridData: Record<string, string[]> = await loadDataFromGrid(id);
+		const gridData: Record<string, string[]> = loadDataFromGrid(id);
 		if (Object.keys(gridData).length === 0) {
 			continue;
 		}
@@ -312,22 +467,22 @@ async function jsonToGridData(data: Record<string, Record<string, string[]>>, wo
 		switch (id) {
 			case 'placeholder-instances-grid': {
 				const vscodeLinkCount = modifyVscodeLinkDataValue(data[id], ['Instances'], workspacePath).vscodeLinkCount;
-				addLinkEventListener(`#${id} vscode-link`, vscodeLinkCount);
+				await addLinkEventListener(`#${id} vscode-link`, vscodeLinkCount);
 				break;
 			}
 			case 'question-instances-grid': {
 				const vscodeLinkCount = modifyVscodeLinkDataValue(data[id], ['Placeholder Instance'], workspacePath).vscodeLinkCount;
-				addLinkEventListener(`#${id} vscode-link`, vscodeLinkCount);
+				await addLinkEventListener(`#${id} vscode-link`, vscodeLinkCount);
 				break;
 			}
 			case 'question-references-grid': {
 				const vscodeLinkCount = modifyVscodeLinkDataValue(data[id], ['Reference', 'Reason'], workspacePath).vscodeLinkCount;
-				addLinkEventListener(`#${id} vscode-link`, vscodeLinkCount);
+				await addLinkEventListener(`#${id} vscode-link`, vscodeLinkCount);
 				break;
 			}
 			case 'answer-point-grid': {
 				const vscodeLinkCount = modifyVscodeLinkDataValue(data[id], ['Reference'], workspacePath).vscodeLinkCount;
-				addLinkEventListener(`#${id} vscode-link`, vscodeLinkCount);
+				await addLinkEventListener(`#${id} vscode-link`, vscodeLinkCount);
 				break;
 			}
 		}
@@ -375,10 +530,18 @@ function init() {
 	};
 
 	(document.getElementById("button-label-reference") as Button).onclick = async (event) => {
-		console.log('button-label-reference in clicked');
 		(document.getElementById("button-label-reference") as Button).disabled = true;
 		(document.getElementById("button-label-reference") as Button).title = 'In Process...';
-		const data: Record<string, string[]> = await loadDataFromGrid('question-instances-grid');
+		const data: Record<string, string[]> = loadDataFromGrid('question-instances-grid');
+		if (Object.keys(data).length === 0) {
+			vscode.postMessage({
+				command: 'error',
+				message: 'No question instances to label references',
+			});
+			(document.getElementById("button-label-reference") as Button).disabled = false;
+			(document.getElementById("button-label-reference") as Button).title = 'Label References';
+			return;
+		}
 		vscode.postMessage({
 			command: "label references",
 			questions: data['Question'],
@@ -388,7 +551,16 @@ function init() {
 	(document.getElementById('button-generate-answer-points') as Button).onclick = async (event) => {
 		(document.getElementById("button-generate-answer-points") as Button).disabled = true;
 		(document.getElementById("button-generate-answer-points") as Button).title = 'In Process...';
-		const data: Record<string, string[]> = await loadDataFromGrid('question-references-grid');
+		const data: Record<string, string[]> = loadDataFromGrid('question-references-grid');
+		if (Object.keys(data).length === 0) {
+			vscode.postMessage({
+				command: 'error',
+				message: 'No question references to generate answer and points',
+			});
+			(document.getElementById("button-generate-answer-points") as Button).disabled = false;
+			(document.getElementById("button-generate-answer-points") as Button).title = 'Generate Answer And Points';
+			return;
+		}
 		vscode.postMessage({
 			command: "generate answer and points",
 			data: data,
@@ -406,6 +578,11 @@ function init() {
 	(document.getElementById('button-save-file') as Button).onclick = async (event) => {
 		(document.getElementById("button-save-file") as Button).disabled = true;
 		(document.getElementById("button-save-file") as Button).title = 'In Process...';
+		if (modifying) {
+			removeVscodeLinkCheckOption();
+			(document.getElementById('button-modify-references') as Button).innerText = 'Modify References';
+			modifying = false;
+		}
 		const data = await gridDataToJson();
 		vscode.postMessage({
 			command: "save file",
@@ -416,6 +593,11 @@ function init() {
 	(document.getElementById('button-save-default-file') as Button).onclick = async (event) => {
 		(document.getElementById("button-save-default-file") as Button).disabled = true;
 		(document.getElementById("button-save-default-file") as Button).title = 'In Process...';
+		if (modifying) {
+			removeVscodeLinkCheckOption();
+			(document.getElementById('button-modify-references') as Button).innerText = 'Modify References';
+			modifying = false;
+		}
 		const data = await gridDataToJson();
 		vscode.postMessage({
 			command: "save default file",
@@ -429,6 +611,26 @@ function init() {
 		vscode.postMessage({
 			command: "auto",
 		});
+	};
+
+	(document.getElementById('button-modify-references') as Button).onclick = async (event) => {
+		console.log(`button-modify-references clicked, modifying: ${modifying}`);
+		if (modifying) {
+			removeVscodeLinkCheckOption();
+			(document.getElementById('button-modify-references') as Button).innerText = 'Modify References';
+			modifying = false;
+		} else {
+			const success = await addVscodeLinkCheckOption();
+			if (!success) {
+				vscode.postMessage({
+					command: 'error',
+					message: 'No question references to modify',
+				});
+				return;
+			}
+			(document.getElementById('button-modify-references') as Button).innerText = 'Apply Modifications';
+			modifying = true;
+		}
 	};
 
 	// (document.getElementById("test-constructing") as Button).onclick = (event) => {
@@ -483,7 +685,7 @@ function init() {
 
 				await fillGrid('placeholder-instances-grid', rowsData);
 
-				addLinkEventListener('vscode-link.placeholder-data-link', expectedVscodeLinkCount);
+				await addLinkEventListener('vscode-link.placeholder-data-link', expectedVscodeLinkCount);
 
 				(document.getElementById('placeholder-instantiation-checkbox') as HTMLElement).innerHTML = 'Placeholder Instantiation Done, Question Instantiating...';
 				(document.getElementById('placeholder-instances-grid') as HTMLElement).style.display = 'block';
@@ -512,7 +714,7 @@ function init() {
 					};
 				}));
 
-				addLinkEventListener('vscode-link.question-data-link', expectedVscodeLinkCount);
+				await addLinkEventListener('vscode-link.question-data-link', expectedVscodeLinkCount);
 
 				(document.getElementById('placeholder-instantiation-checkbox') as HTMLElement).innerHTML = 'Placeholder And Question Instantiation Done';
 				(document.getElementById('placeholder-instantiation-checkbox') as HTMLElement).setAttribute('checked', 'true');
@@ -530,9 +732,10 @@ function init() {
 			case 'benchmark references': {
 				switch (message.type) {
 					case 'init': {
+						contextGridRowReasonVscodeLinkCount = Array(message.questions.length).fill(0);
 						(document.getElementById("button-load-file") as Button).disabled = true;
 						(document.getElementById("button-save-file") as Button).disabled = true;
-						await fillGrid('question-references-grid', message.questions.map(question => {
+						await fillGrid('question-references-grid', (message.questions as string[]).map((question: string, index: number) => {
 							return {
 								'Question': question,
 								'Reference': '',
@@ -548,49 +751,59 @@ function init() {
 							};
 						}));
 						(document.getElementById('question-references-grid') as HTMLElement).style.display = 'block';
-						(document.getElementById('reference-progress-wrapper') as HTMLElement).style.display = 'block';
+						(document.getElementById('button-label-reference') as Button)!.disabled = true;
+						(document.getElementById('button-label-reference') as Button).title = 'Modify References';
+						modifying = false;
 						break;
 					}
 					case 'build graphs': {
 						(document.getElementById('reference-checkbox') as HTMLElement).innerHTML = `Building Graphs...`;
 						break;
 					}
-					case 'build graphs doneS': {
-						(document.getElementById('reference-checkbox') as HTMLElement).innerHTML = `Building Graphs Done`;
+					case 'build graphs done': {
+						(document.getElementById('reference-checkbox') as HTMLElement).innerHTML = `Building Graphs Done, Labeling References...`;
 						break;
 					}
 					case 'question': {
-						contextGridRowIndex += 1;
-						contextGridRowReasonVscodeLinkCount = 0;
-						(document.getElementById('reference-checkbox') as HTMLElement).innerHTML = `Labeling References for question '<strong>${message.question}</strong>'`;
-						(document.getElementById('reference-progress-bar') as HTMLElement).style.width = '0%';
-						(document.getElementById('reference-progress-bar') as HTMLElement).innerHTML = '0%';
+						appendGridCell('question-references-grid', message.index, 0, `<br>
+<div id="question-hint-${message.index}">Labeling Reference Context from File: </div><br>
+<div class="progress-container" id="reference-progress-wrapper-${message.index}">
+	<div class="progress-bar" id="reference-progress-bar-${message.index}">0%</div>
+</div>
+`.trim());
 						break;
 					}
 					case 'analyse file': {
-						(document.getElementById('reference-checkbox') as HTMLElement).innerHTML = `Labeling References for question '<strong>${message.question}</strong>' in file: <vscode-link class="reference-progress-link" data-type="File" data-value="${message.workspacePath}#${message.relativePath}">${message.relativePath}</vscode-link>`;
-						addLinkEventListener(`vscode-link.reference-progress-link`, 1);
-						(document.getElementById('reference-progress-bar') as HTMLElement).style.width = message.percent + '%';
-						(document.getElementById('reference-progress-bar') as HTMLElement).innerHTML = message.percent + '%';
+						(document.getElementById(`question-hint-${message.index}`) as HTMLElement).innerHTML = `Labeling Reference Context from File: <vscode-link class="reference-progress-link-${message.index}" data-type="File" data-value="${message.workspacePath}#${message.relativePath}">${message.relativePath}</vscode-link>`;
+						(document.getElementById(`reference-progress-bar-${message.index}`) as HTMLElement).style.width = `${message.percent}%`;
+						(document.getElementById(`reference-progress-bar-${message.index}`) as HTMLElement).innerHTML = `${message.percent}%`;
+						await addLinkEventListener(`vscode-link.reference-progress-link-${message.index}`, 1);
 						break;
 					}
 					case 'references': {
+						const index = message.index;
 						const references = (message.updatedReferences as FileChunk[]).map(fileChunk => {
-							return `<vscode-link class="question-context-link-${contextGridRowIndex}" data-type="Range" data-value="${message.workspacePath}#${fileChunk.relativePath}#${fileChunk.startLine}#${fileChunk.endLine}">${fileChunk.relativePath}:${fileChunk.startLine}~${fileChunk.endLine}</vscode-link>`;
+							return `<vscode-link class="question-context-link-${index}" data-type="Range" data-value="${message.workspacePath}#${fileChunk.relativePath}#${fileChunk.startLine}#${fileChunk.endLine}">${fileChunk.relativePath}:${fileChunk.startLine}~${fileChunk.endLine}</vscode-link>`;
 						}).join('<br>').trim();
 
-						const relatviePath: string = (message.updatedReferences as FileChunk[])[0].relativePath;
-
-						await updateGridCell('question-references-grid', contextGridRowIndex, 1, references);
-						await updateGridCell('answer-point-grid', contextGridRowIndex, 1, references);
+						updateGridCell('question-references-grid', index, 1, references);
+						updateGridCell('answer-point-grid', index, 1, references);
 						let resonMsg = '';
 						message.references.forEach((reference: FileChunk) => {
-							contextGridRowReasonVscodeLinkCount += 1;
-							resonMsg += `<vscode-link class="question-context-link-${contextGridRowIndex}" data-type="File" data-value="${message.workspacePath}#${reference.relativePath}">${reference.relativePath}</vscode-link><br>`;
+							contextGridRowReasonVscodeLinkCount[index] += 1;
+							resonMsg += `<vscode-link class="question-context-link-${index}" data-type="Range" data-value="${message.workspacePath}#${reference.relativePath}#${reference.startLine}#${reference.endLine}">${reference.relativePath}:${reference.startLine}~${reference.endLine}</vscode-link><br>`;
 						});
 						resonMsg += `Reason: ${message.reason}`;
-						await appendGridCell('question-references-grid', contextGridRowIndex, 2, resonMsg);
-						addLinkEventListener(`vscode-link.question-context-link-${contextGridRowIndex}`, contextGridRowReasonVscodeLinkCount + 2 * (message.updatedReferences as FileChunk[]).length);
+						appendGridCell('question-references-grid', index, 2, resonMsg);
+						await addLinkEventListener(`vscode-link.question-context-link-${index}`, contextGridRowReasonVscodeLinkCount[index] + 2 * (message.updatedReferences as FileChunk[]).length);
+						break;
+					}
+					case 'question done': {
+						const index = message.index;
+						(document.getElementById(`question-hint-${message.index}`) as HTMLElement).innerHTML = `Labeling Reference Context Done`;
+						(document.getElementById(`reference-progress-bar-${message.index}`) as HTMLElement).style.width = `100%`;
+						(document.getElementById(`reference-progress-bar-${message.index}`) as HTMLElement).innerHTML = `100%`;
+						updateGridCell('question-references-grid', index, 0, message.question);
 						break;
 					}
 					case 'done': {
@@ -600,6 +813,7 @@ function init() {
 						(document.getElementById('reference-checkbox') as HTMLElement).setAttribute('checked', 'true');
 						(document.getElementById("button-load-file") as Button).disabled = false;
 						(document.getElementById("button-save-file") as Button).disabled = false;
+						(document.getElementById('button-save-default-file') as Button).click();
 						if (auto) {
 							await sleep(5000);
 							(document.getElementById('button-generate-answer-points') as Button).click();
@@ -656,9 +870,12 @@ function init() {
 			case 'load file': {
 				switch (message.type) {
 					case 'success': {
-						console.log(`load file success data:${Object.keys(message.data)}  workspacePath: ${message.workspacePath}`);
 						await jsonToGridData(message.data, message.workspacePath);
 						(document.getElementById("button-load-file") as Button).disabled = false;
+						if (modifying) {
+							(document.getElementById("button-modify-references") as Button).textContent = 'Modify References';
+						}
+						addLinkEventListener(`vscode-link`, -1);
 						break;
 					}
 					case 'fail': {
@@ -675,6 +892,12 @@ function init() {
 			}
 			case 'save default file': {
 				(document.getElementById("button-save-default-file") as Button).disabled = false;
+				break;
+			}
+			case 'add reference': {
+				if (modifying) {
+					addReference(message.rowIndex, message.rawReference, message.workspacePath, message.relativeFilePath, message.startLine, message.endLine);
+				}
 				break;
 			}
 			case 'benchmark fail': {

@@ -1,6 +1,6 @@
 import { Disposable, Uri, Webview, WebviewPanel, window, ViewColumn } from "vscode";
 import { getWebviewContent } from "../gui/benchmark";
-import { auto, constructBenchmark, generateAnswerAndPoints, instantiateQuestions, labelRelevantContext, loadJsonData, saveJsonData, saveJsonDataDefault } from "../benchmark/main";
+import { auto, checkReference, constructBenchmark, generateAnswerAndPoints, instantiateQuestions, labelRelevantContext, loadJsonData, saveJsonData, saveJsonDataDefault } from "../benchmark/main";
 import { handleLink } from './main';
 
 import { testLLM } from './llm';
@@ -61,6 +61,12 @@ export class BenchmarkWebviewPanel {
 						return;
 					case 'auto':
 						await auto();
+						return;
+					case 'check reference':
+						checkReference(message.reference, message.rowIndex);
+						return;
+					case 'error':
+						window.showErrorMessage(message.message);
 						return;
 				}
 			}

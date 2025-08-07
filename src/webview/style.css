@@ -165,3 +165,55 @@ vscode-panels {
     font-size: 12px;
     font-family: var(--vscode-font-family);
 }
+
+.selector {
+  display: flex;
+  flex-direction: row;
+  gap: 24px; /* 控制两个选项之间的间距 */
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  margin: 8px 0;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.checkbox {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #555;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+  font-size: 18px;
+  user-select: none;
+}
+
+.checkbox.accept.checked {
+  background-color: #d4f4dd;
+  color: green;
+}
+
+.checkbox.reject.checked {
+  background-color: #fce1e1;
+  color: red;
+}
+
+body {
+    padding-top: 60px; /* 顶部留出导航栏空间 */
+}
+
+/* 导航栏样式 */
+.navbar {
+    position: fixed; /* 固定定位 */
+    top: 0;         /* 置于顶部 */
+    left: 0;        /* 从左侧开始 */
+    width: 100%;    /* 覆盖整个视口宽度 */
+    background: #333;
+    padding: 15px 20px;
+    color: white;
+    z-index: 1000;   /* 确保在最上层 */
+}

@@ -35,3 +35,29 @@ export function pathToDots(path: string): string {
 		.replace(/[\/\\]+/g, '.');  // 替换中间的分隔符
 }
 
+export async function concurrencyRun<T>(
+	tasks: (() => Promise<T>)[],
+	concurrency: number
+): Promise<T[]> {
+	const results: T[] = [];
+	const executing = new Set<Promise<void>>();
+
+	for (const task of tasks) {
+		const p = task().then(result => {
+			results.push(result);
+		});
+
+		executing.add(p);
+
+		p.finally(() => {
+			executing.delete(p);
+		});
+
+		if (executing.size >= concurrency) {
+			await Promise.race(executing);
+		}
+	}
+
+	await Promise.all(executing);
+	return results;
+}
