@@ -120,6 +120,44 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
         <vscode-checkbox readonly id="reference-checkbox">Label Question References</vscode-checkbox>
 
         <vscode-button title="Please Finish Step 1" appearance="primary" id="button-label-reference">Label References</vscode-button>
+
+        <vscode-divider role="separator"></vscode-divider>
+
+        <vscode-button appearance="primary" id="button-timed-label">Timed Label References</vscode-button>
+
+        <div class="time-picker">
+            <label for="hours">Begin Time : Hour</label>
+            <select id="time-picker-hours-begin">
+                <!-- 0-23小时选项 -->
+            </select>
+
+            <span>:</span>
+            
+            <label for="minutes">Minute</label>
+            <select id="time-picker-minutes-begin">
+                <!-- 0-59分钟选项 -->
+            </select>
+            
+        </div>
+
+        <div class="time-picker">
+            <label for="hours">End Time   : Hour</label>
+            <select id="time-picker-hours-end">
+                <!-- 0-23小时选项 -->
+            </select>
+
+            <span>:</span>
+            
+            <label for="minutes">Minute</label>
+            <select id="time-picker-minutes-end">
+                <!-- 0-59分钟选项 -->
+            </select>
+            
+        </div>
+
+        <div id="chosen-time" class="hidden">
+
+        </div>
         
         <vscode-data-grid class="hidden" id="question-references-grid" grid-template-columns="1fr 1fr 2fr"></vscode-data-grid>
 

@@ -340,7 +340,7 @@ export async function labelRelevantContext(questions: string[]): Promise<void> {
                     relativePath: path.relative(workspacePath, file),
                     percent: (count / files.length * 100).toFixed(2),
                 });
-                const context: QuestionContext = await agent.invoke(question, file, repoName, mergedGraph);
+                const context: QuestionContext = await agent.mockInvoke(question, file, repoName, mergedGraph);
                 references = mergeFileChunks([...references, ...context.references]);
                 if (context.references.length > 0) {
                     postMessage({

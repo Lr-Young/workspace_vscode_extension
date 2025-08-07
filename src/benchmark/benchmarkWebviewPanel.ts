@@ -68,6 +68,9 @@ export class BenchmarkWebviewPanel {
 					case 'error':
 						window.showErrorMessage(message.message);
 						return;
+					case 'info':
+						window.showInformationMessage(message.message);
+						return;
 				}
 			}
 		);

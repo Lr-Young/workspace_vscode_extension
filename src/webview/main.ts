@@ -8,7 +8,7 @@ import {
 
 import { dataLoaders } from "../gui/components";
 import { FileChunk, mergeFileChunks, Placeholder, PlaceholderInstance, QuestionInstance } from "../benchmark/typeDefinitions";
-import { sleep } from '../utils';
+import { executeInTimeRange, sleep } from '../utils';
 
 const vscode = acquireVsCodeApi();
 let contextGridRowReasonVscodeLinkCount: number[] = [];
@@ -532,6 +532,8 @@ function init() {
 	(document.getElementById("button-label-reference") as Button).onclick = async (event) => {
 		(document.getElementById("button-label-reference") as Button).disabled = true;
 		(document.getElementById("button-label-reference") as Button).title = 'In Process...';
+		(document.getElementById("button-timed-label") as Button).disabled = true;
+		(document.getElementById("button-timed-label") as Button).title = 'Waiting for labeling...';
 		const data: Record<string, string[]> = loadDataFromGrid('question-instances-grid');
 		if (Object.keys(data).length === 0) {
 			vscode.postMessage({
@@ -540,6 +542,8 @@ function init() {
 			});
 			(document.getElementById("button-label-reference") as Button).disabled = false;
 			(document.getElementById("button-label-reference") as Button).title = 'Label References';
+			(document.getElementById("button-timed-label") as Button).disabled = false;
+			(document.getElementById("button-timed-label") as Button).title = 'Timed Label References';
 			return;
 		}
 		vscode.postMessage({
@@ -631,6 +635,80 @@ function init() {
 			(document.getElementById('button-modify-references') as Button).innerText = 'Apply Modifications';
 			modifying = true;
 		}
+	};
+
+	// 填充小时选项 (0-23)
+	const hoursSelectBegin = (document.getElementById('time-picker-hours-begin') as HTMLSelectElement);
+	for (let i = 0; i < 24; i++) {
+		const option = document.createElement('option');
+		option.value = `${i}`;
+		option.textContent = i.toString().padStart(2, '0');
+		hoursSelectBegin?.appendChild(option);
+	}
+
+	// 填充分钟选项 (0-59)
+	const minutesSelectBegin = (document.getElementById('time-picker-minutes-begin') as HTMLSelectElement);
+	for (let i = 0; i < 60; i++) {
+		const option = document.createElement('option');
+		option.value = `${i}`;
+		option.textContent = i.toString().padStart(2, '0');
+		minutesSelectBegin?.appendChild(option);
+	}
+
+	// 填充小时选项 (0-23)
+	const hoursSelectEnd = (document.getElementById('time-picker-hours-end') as HTMLSelectElement);
+	for (let i = 0; i < 24; i++) {
+		const option = document.createElement('option');
+		option.value = `${i}`;
+		option.textContent = i.toString().padStart(2, '0');
+		hoursSelectEnd?.appendChild(option);
+	}
+
+	// 填充分钟选项 (0-59)
+	const minutesSelectEnd = (document.getElementById('time-picker-minutes-end') as HTMLSelectElement);
+	for (let i = 0; i < 60; i++) {
+		const option = document.createElement('option');
+		option.value = `${i}`;
+		option.textContent = i.toString().padStart(2, '0');
+		minutesSelectEnd?.appendChild(option);
+	}
+
+	(document.getElementById('button-timed-label') as Button).onclick = (event) => {
+
+		const startHour: number = parseInt(hoursSelectBegin?.value || '0');
+		const startMinute: number = parseInt(minutesSelectBegin?.value || '0');
+		const endHour: number = parseInt(hoursSelectEnd?.value || '0');
+		const endMinute: number = parseInt(minutesSelectEnd?.value || '0');
+
+		if (startHour === endHour && startMinute === endMinute) {
+			vscode.postMessage({
+				command: 'error',
+				message: 'Start time and end time cannot be the same',
+			});
+			return;
+		}
+
+		const chosenTimeDiv = (document.getElementById('chosen-time') as HTMLElement);
+		chosenTimeDiv.style.display = 'block';
+		chosenTimeDiv.innerHTML = `Start Time: ${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')} - End Time: ${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`;
+
+		executeInTimeRange(
+			() => {
+				(document.getElementById("button-label-reference") as Button).click();
+			},
+			startHour,
+			startMinute,
+			endHour,
+			endMinute,
+			(msg: string) => {
+				vscode.postMessage({
+					command: 'info',
+					message: msg,
+				});
+			}
+		);
+
+		(document.getElementById('button-timed-label') as Button).disabled = true;
 	};
 
 	// (document.getElementById("test-constructing") as Button).onclick = (event) => {
@@ -751,8 +829,8 @@ function init() {
 							};
 						}));
 						(document.getElementById('question-references-grid') as HTMLElement).style.display = 'block';
-						(document.getElementById('button-label-reference') as Button)!.disabled = true;
-						(document.getElementById('button-label-reference') as Button).title = 'Modify References';
+						(document.getElementById('button-modify-references') as Button)!.disabled = true;
+						(document.getElementById('button-modify-references') as Button).title = 'Waiting for labeling references...';
 						modifying = false;
 						break;
 					}
@@ -809,10 +887,12 @@ function init() {
 					case 'done': {
 						(document.getElementById('button-generate-answer-points') as Button)!.disabled = false;
 						(document.getElementById("button-label-reference") as Button).disabled = false;
+						(document.getElementById("button-timed-label") as Button).disabled = false;
 						(document.getElementById('reference-checkbox') as HTMLElement).innerHTML = `Labeling References Done`;
 						(document.getElementById('reference-checkbox') as HTMLElement).setAttribute('checked', 'true');
 						(document.getElementById("button-load-file") as Button).disabled = false;
 						(document.getElementById("button-save-file") as Button).disabled = false;
+						(document.getElementById('button-modify-references') as Button)!.disabled = false;
 						(document.getElementById('button-save-default-file') as Button).click();
 						if (auto) {
 							await sleep(5000);
