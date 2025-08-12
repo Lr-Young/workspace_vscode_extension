@@ -79,6 +79,13 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
         <vscode-button appearance="primary" id="button-auto">Auto</vscode-button>
 
         <vscode-button appearance="primary" id="button-modify-references">Modify References</vscode-button>
+
+        <vscode-button appearance="primary" id="button-export-json">Export Json</vscode-button>
+
+        <vscode-button appearance="primary" id="button-export-excel">Export Excel</vscode-button>
+
+        <vscode-button appearance="primary" id="button-test-llm">Test LLM</vscode-button>
+
     </div>
 
     <h1>Workspace Benchmark Dataset</h1>
@@ -168,16 +175,11 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
     <section class="component-container">
         <h2>Step 3: Generate Answer And Points</h2>
 
-        <div class="horizontal progress">
-            <vscode-checkbox readonly id="answer-point-checkbox">Generate Answer And Points</vscode-checkbox>
-            <div class="progress-container hidden" id="answer-point-progress-wrapper">
-                <div class="progress-bar" id="answer-point-progress-bar">0%</div>
-            </div>
-        </div>
+        <vscode-checkbox readonly id="answer-point-checkbox">Generate Answer And Points</vscode-checkbox>
 
         <vscode-button title="Please Finish Step 2" appearance="primary" id="button-generate-answer-points">genreate Answer and Points</vscode-button>
         
-        <vscode-data-grid class="hidden" id="answer-point-grid" grid-template-columns="1fr 1fr 2fr"></vscode-data-grid>
+        <vscode-data-grid class="hidden" id="answer-point-grid" grid-template-columns="1fr 2fr 2fr 2fr"></vscode-data-grid>
 
     </section>
 

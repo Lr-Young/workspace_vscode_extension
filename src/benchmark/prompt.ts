@@ -1,6 +1,6 @@
 import { escapePathForJsonKey } from './typeDefinitions';
 
-function addLineNumber(content: string, startLine: number=0): string {
+export function addLineNumber(content: string, startLine: number=0): string {
 	const lines = content.split('\n');
 	const numberedLines = lines.map((line, index) => {
 		return `${startLine + index + 1}: ${line}`;
@@ -90,7 +90,6 @@ export function getGenerateAnswerPrompt(
 	references: {
 		relativePathWithRepoName: string,
 		content: string,
-		startLine: number,
 		language: string,
 	}[],
 ) {
@@ -112,7 +111,7 @@ ${references.map(reference => {
 	return `
 **File Path**: ${reference.relativePathWithRepoName}
 \`\`\`${reference.language}
-${addLineNumber(reference.content, reference.startLine)}
+${reference.content}
 \`\`\`
 `.trim();
 }).join('\n')}

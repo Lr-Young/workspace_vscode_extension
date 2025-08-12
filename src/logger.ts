@@ -4,6 +4,8 @@ import { AIMessage } from '@langchain/core/messages';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 import { ChatPromptValue } from '@langchain/core/prompt_values';
 
+import { OpenAI } from 'openai';
+
 function formatDateTime(): string {
   const now = new Date();
   
@@ -66,9 +68,13 @@ export class LLMLogger {
         return LLMLogger._instance;
     }
 
-	log(content: ChatPromptValue | AIMessage): void {
+	log(content: ChatPromptValue | AIMessage | OpenAI.Chat.Completions.ChatCompletion | string): void {
 		const time = formatDateTime();
 		try {
+            if (typeof content === "string") {
+                console.log(`LLMLogger log warning: content is not type of ChatPromptTemplate | AIMessage\ntype: ${(content as Object).constructor.name}\n${content}`);
+                return;
+            }
             if (content instanceof ChatPromptValue) {
                 fs.promises.appendFile(this.rawLLMFilePath, `${time}Context Agent Input\n${JSON.stringify(content, null, 4)}\n`);
                 fs.promises.appendFile(this.logFilePath, `${time}Context Agent Input\n${content}\n`);
@@ -76,7 +82,8 @@ export class LLMLogger {
                 fs.promises.appendFile(this.rawLLMFilePath, `${time}Context Agent Output\n${JSON.stringify(content, null, 4)}\n`);
                 fs.promises.appendFile(this.logFilePath, `${time}Context Agent Output\n${(content as AIMessage).content}\n`);
             } else {
-                console.log(`LLMLogger log warning: content is not type of ChatPromptTemplate | AIMessage\ntype: ${(content as Object).constructor.name}\n${content}`);
+                fs.promises.appendFile(this.rawLLMFilePath, `${time}Context Agent Output\n${JSON.stringify(content, null, 4)}\n`);
+                fs.promises.appendFile(this.logFilePath, `${time}Context Agent Output\n${content}\n`);
             }
 		} catch (error) {
 			console.log(`LLMLogger log failed: ${error}`);

@@ -9,6 +9,7 @@ import {
 import { dataLoaders } from "../gui/components";
 import { FileChunk, mergeFileChunks, Placeholder, PlaceholderInstance, QuestionInstance } from "../benchmark/typeDefinitions";
 import { executeInTimeRange, sleep } from '../utils';
+import { commands } from "vscode";
 
 const vscode = acquireVsCodeApi();
 let contextGridRowReasonVscodeLinkCount: number[] = [];
@@ -256,6 +257,23 @@ function modifyVscodeLinkDataValue(data: Record<string, string[]>, titles: strin
 		});
 	});
 	return output;
+}
+
+function loadPureJsonData(): Record<string, string[]> {
+	const data: Record<string, string[]> = loadDataFromGrid('answer-point-grid');
+
+	data['Reference'] = data['Reference'].map((references: string) => {
+		return references.split('<br>').map((reference: string) => {
+			const div: HTMLElement = document.createElement('div') as HTMLElement;
+			div.innerHTML = reference;
+			if (div.querySelectorAll('vscode-link').length === 0) {
+				return reference;
+			}
+			return div.querySelectorAll('vscode-link')[0].textContent;
+		}).join('\n');
+	});
+
+	return data;
 }
 
 async function registerOnclickEvent(rowIndex: number, vscodeLinkCount: number): Promise<void> {
@@ -535,6 +553,7 @@ function init() {
 		(document.getElementById("button-timed-label") as Button).disabled = true;
 		(document.getElementById("button-timed-label") as Button).title = 'Waiting for labeling...';
 		const data: Record<string, string[]> = loadDataFromGrid('question-instances-grid');
+		const contextData: Record<string, string[]> = loadDataFromGrid('question-references-grid');
 		if (Object.keys(data).length === 0) {
 			vscode.postMessage({
 				command: 'error',
@@ -546,16 +565,29 @@ function init() {
 			(document.getElementById("button-timed-label") as Button).title = 'Timed Label References';
 			return;
 		}
-		vscode.postMessage({
-			command: "label references",
-			questions: data['Question'],
-		});
+		if (Object.keys(contextData).length === 0) {
+			vscode.postMessage({
+				command: "label references",
+				questions: data['Question'],
+				currentFiles: [],
+			});
+		} else {
+			const questions: string[] = [];
+			const currentFiles: string[] = [];
+			contextData['Question'].forEach(q => {
+				
+			});
+			vscode.postMessage({
+				command: "label references",
+
+			});
+		}
 	};
 
 	(document.getElementById('button-generate-answer-points') as Button).onclick = async (event) => {
 		(document.getElementById("button-generate-answer-points") as Button).disabled = true;
 		(document.getElementById("button-generate-answer-points") as Button).title = 'In Process...';
-		const data: Record<string, string[]> = loadDataFromGrid('question-references-grid');
+		const data: Record<string, string[]> = loadDataFromGrid('answer-point-grid');
 		if (Object.keys(data).length === 0) {
 			vscode.postMessage({
 				command: 'error',
@@ -590,6 +622,37 @@ function init() {
 		const data = await gridDataToJson();
 		vscode.postMessage({
 			command: "save file",
+			data: data,
+		});
+	};
+
+	(document.getElementById('button-export-json') as Button).onclick = async (event) => {
+		(document.getElementById("button-export-json") as Button).disabled = true;
+		(document.getElementById("button-export-json") as Button).title = 'In Process...';
+		if (modifying) {
+			removeVscodeLinkCheckOption();
+			(document.getElementById('button-modify-references') as Button).innerText = 'Modify References';
+			modifying = false;
+		}
+		const data = loadPureJsonData();
+		
+		vscode.postMessage({
+			command: "export json",
+			data: data,
+		});
+	};
+
+	(document.getElementById('button-export-excel') as Button).onclick = async (event) => {
+		(document.getElementById("button-export-excel") as Button).disabled = true;
+		(document.getElementById("button-export-excel") as Button).title = 'In Process...';
+		if (modifying) {
+			removeVscodeLinkCheckOption();
+			(document.getElementById('button-modify-references') as Button).innerText = 'Modify References';
+			modifying = false;
+		}
+		const data = loadPureJsonData();
+		vscode.postMessage({
+			command: "export excel",
 			data: data,
 		});
 	};
@@ -711,11 +774,11 @@ function init() {
 		(document.getElementById('button-timed-label') as Button).disabled = true;
 	};
 
-	// (document.getElementById("test-constructing") as Button).onclick = (event) => {
-	// 	vscode.postMessage({
-	// 		command: "testButton",
-	// 	});
-	// };
+	(document.getElementById("button-test-llm") as Button).onclick = (event) => {
+		vscode.postMessage({
+			command: "testButton",
+		});
+	};
 
 	window.addEventListener('message', async event => {
 		const message = event.data;
@@ -907,23 +970,13 @@ function init() {
 				switch (message.type) {
 					case 'init': {
 						(document.getElementById('answer-point-grid') as HTMLElement).style.display = 'block';
-						(document.getElementById('answer-point-progress-wrapper') as HTMLElement).style.display = 'block';
-						(document.getElementById('answer-point-progress-bar') as HTMLElement).style.width = '0%';
-						(document.getElementById('answer-point-progress-bar') as HTMLElement).innerHTML = '0%';
 						(document.getElementById("button-load-file") as Button).disabled = true;
 						(document.getElementById("button-save-file") as Button).disabled = true;
 						break;
 					}
-					case 'question': {
-						answerGridRowIndex += 1;
-						(document.getElementById('answer-point-checkbox') as HTMLElement).innerHTML = `Generating Answer and Evaluation for question '<strong>${message.question}</strong>'`;
-						break;
-					}
 					case 'answer': {
-						await appendGridCell('answer-point-grid', answerGridRowIndex, 2, message.answer);
-						await appendGridCell('answer-point-grid', answerGridRowIndex, 3, message.points);
-						(document.getElementById('answer-point-progress-bar') as HTMLElement).style.width = `${message.percent}%`;
-						(document.getElementById('answer-point-progress-bar') as HTMLElement).innerHTML = `${message.percent}%`;
+						appendGridCell('answer-point-grid', message.questionId, 2, message.answer);
+						appendGridCell('answer-point-grid', message.questionId, 3, message.points);
 						break;
 					}
 					case 'done': {
@@ -968,6 +1021,14 @@ function init() {
 			}
 			case 'save file': {
 				(document.getElementById("button-save-file") as Button).disabled = false;
+				break;
+			}
+			case 'export json': {
+				(document.getElementById("button-export-json") as Button).disabled = false;
+				break;
+			}
+			case 'export excel': {
+				(document.getElementById("button-export-excel") as Button).disabled = false;
 				break;
 			}
 			case 'save default file': {

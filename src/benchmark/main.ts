@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fg from 'fast-glob';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as XLSX from 'xlsx';
 
 import { concurrencyRun, shuffle } from '../utils';
 import { FileChunk, Graph, mergeGraph, mergeFileChunks, Placeholder, PlaceholderInstance, QuestionContext, QuestionInstance, QuestionTemplate, supportedLanguages, GridType, GRID_STRUCTURES } from './typeDefinitions';
@@ -22,14 +23,14 @@ const excludePattern = [
 const questionTemplates: QuestionTemplate[] = [
     `What is the implementation logic of class ${Placeholder.Class}`,
     `What is the implementation logic of function ${Placeholder.Function}`,
-    `What is the usage of class ${Placeholder.Class}`,
-    `What is the usage of function ${Placeholder.Function}`,
-    `Can directory ${Placeholder.Folder} be removed?`,
-    `Can file ${Placeholder.File} be remove?`,
-    `What is the meaning of directory ${Placeholder.Folder}?`,
-    `What is the meaning of file ${Placeholder.File}?`,
-    `What is the meaning of class ${Placeholder.Class}?`,
-    `What is the meaning of function ${Placeholder.Function}?`,
+    `Where and what is the usage of class ${Placeholder.Class}`,
+    `Where and what is the usage of function ${Placeholder.Function}`,
+    `Can directory ${Placeholder.Folder} be removed from the codebase?`,
+    `Can file ${Placeholder.File} be removed from the code base?`,
+    `What is the meaning of the name of directory ${Placeholder.Folder}?`,
+    `What is the meaning of the name of file ${Placeholder.File}?`,
+    `What is the meaning of the name of class ${Placeholder.Class}?`,
+    `What is the meaning of the name of function ${Placeholder.Function}?`,
     `What is the role of file ${Placeholder.File}?`,
     `What is the role of class ${Placeholder.Class}?`,
     `What is the role of directory ${Placeholder.Folder}?`,
@@ -340,6 +341,8 @@ export async function labelRelevantContext(questions: string[]): Promise<void> {
                     relativePath: path.relative(workspacePath, file),
                     percent: (count / files.length * 100).toFixed(2),
                 });
+
+                await sleep(Math.floor(Math.random() * 500) + Math.floor(Math.random() * 500));
                 const context: QuestionContext = await agent.invoke(question, file, repoName, mergedGraph);
                 references = mergeFileChunks([...references, ...context.references]);
                 if (context.references.length > 0) {
@@ -367,6 +370,8 @@ export async function labelRelevantContext(questions: string[]): Promise<void> {
 
     await concurrencyRun(tasks, questionCount);
 
+    // await concurrencyRun(tasks, 1);
+
     postMessage({
         command: 'benchmark references',
         type: 'done',
@@ -387,6 +392,8 @@ export async function generateAnswerAndPoints(data: Record<string, string[]>): P
     const pattern = /^<vscode-link[^>]*>([^:]*):(\d+)~(\d+)<\/vscode-link>$/;
 
     const questions: string[] = data['Question'];
+    const answers: string[] = data['Answer'];
+    const points: string[] = data['Evaluation'];
     const references: FileChunk[][] = [];
 
     data['Reference'].forEach(element => {
@@ -425,22 +432,37 @@ export async function generateAnswerAndPoints(data: Record<string, string[]>): P
 
     const pointsAgent: PointsAgent = new PointsAgent();
 
+    const tasks: (() => Promise<void>)[] = [];
+
     for (let i = 0; i < questions.length; i++) {
+
+        if (answers[i] !== "" && points[i] !== "") {
+            continue;
+        }
+
         postMessage({
             command: 'benchmark answer',
             type: 'question',
-            question: questions[i],
         });
-        const answer: string = await answerAgent.invoke(questions[i], references[i], workspacePath, repoName);
-        const points: string = await pointsAgent.invoke(questions[i], answer);
-        postMessage({
-            command: 'benchmark answer',
-            type: 'answer',
-            answer: answer,
-            points: points,
-            percent: ((i + 1) / questions.length * 100).toFixed(2),
+
+        tasks.push(async ()=> {
+            await sleep(Math.floor(Math.random() * 500) + Math.floor(Math.random() * 500));
+            const answer: string = await answerAgent.invoke(questions[i], references[i], workspacePath, repoName);
+            await sleep(Math.floor(Math.random() * 500) + Math.floor(Math.random() * 500));
+            const points: string = await pointsAgent.invoke(questions[i], answer);
+            postMessage({
+                command: 'benchmark answer',
+                type: 'answer',
+                answer: answer,
+                points: points,
+                questionId: i,
+            });
         });
     }
+
+    // await concurrencyRun(tasks, 1);
+
+    await concurrencyRun(tasks, 5);
 
     postMessage({
         command: 'benchmark answer',
@@ -534,8 +556,6 @@ export async function saveJsonData(data: any) {
         }
     });
 
-    console.log(`${uri}`);
-
     if (uri) {
         try {
             await vscode.workspace.fs.writeFile(
@@ -549,6 +569,109 @@ export async function saveJsonData(data: any) {
     }
     postMessage({
         command: 'save file',
+    });
+}
+
+export async function exportJson(data: any) {
+
+    if (Object.keys(data).length === 0) {
+        vscode.window.showErrorMessage('No Data to Export, Please Fill Data in the Grid First');
+        postMessage({
+            command: 'export json',
+        });
+        return;
+    }
+
+    if (!('Question' in data) || data['Question'].length === 0) {
+        vscode.window.showErrorMessage('No Question in Answer Point grid, Please Fill Data in the Grid First');
+        postMessage({
+            command: 'export json',
+        });
+        return;
+    }
+
+    const uri = await vscode.window.showSaveDialog({
+        filters: {
+            'JSON Files': ['json']
+        }
+    });
+
+    if (uri) {
+        try {
+            await vscode.workspace.fs.writeFile(
+                uri,
+                Buffer.from(JSON.stringify(data, null, 2))
+            );
+            vscode.window.showInformationMessage('Json File saved successfully');
+        } catch (error) {
+            vscode.window.showErrorMessage(`Fail to save json file: ${error}`);
+        }
+    }
+    postMessage({
+        command: 'export json',
+    });
+}
+
+export async function exportExcel(data: Record<string, string[]>) {
+
+    if (Object.keys(data).length === 0) {
+        vscode.window.showErrorMessage('No Data to Export, Please Fill Data in the Grid First');
+        postMessage({
+            command: 'export excel',
+        });
+        return;
+    }
+
+    if (!('Question' in data) || data['Question'].length === 0) {
+        vscode.window.showErrorMessage('No Question in Answer Point grid, Please Fill Data in the Grid First');
+        postMessage({
+            command: 'export excel',
+        });
+        return;
+    }
+
+    const excelData: Record<string, string>[] = [];
+
+    for (let i = 0; i < data['Question'].length; i++) {
+        const cell: Record<string, string> = {};
+        Object.entries(data).forEach(([title, content]) => {
+            cell[title] = content[i];
+        });
+        excelData.push(cell);
+    }
+
+    const uri = await vscode.window.showSaveDialog({
+        filters: {
+            'Excel Files': ['excel']
+        }
+    });
+
+    if (uri) {
+        try {
+
+            // 创建工作簿
+            const workbook = XLSX.utils.book_new();
+            
+            // 将数据转换为工作表
+            const worksheet = XLSX.utils.json_to_sheet(excelData);
+            
+            // 将工作表添加到工作簿
+            XLSX.utils.book_append_sheet(workbook, worksheet, "workspace benchmark");
+            
+            // 生成Excel文件缓冲区
+            const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
+                        
+            await vscode.workspace.fs.writeFile(
+                uri,
+                excelBuffer
+            );
+            vscode.window.showInformationMessage('Excel File saved successfully');
+        } catch (error) {
+            vscode.window.showErrorMessage(`Fail to save excel file: ${error}`);
+        }
+    }
+    postMessage({
+        command: 'export excel',
     });
 }
 

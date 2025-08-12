@@ -6,12 +6,16 @@ import { BaseOutputParser, FormatInstructionsOptions } from '@langchain/core/out
 import { Callbacks } from "@langchain/core/callbacks/manager";
 import { Runnable, RunnableLambda } from "@langchain/core/runnables";
 
+import { ChatAlibabaTongyi } from '@langchain/community/chat_models/alibaba_tongyi';
+
+import { OpenAI } from "openai";
+
 import { readFileSync } from 'fs';
 import * as path from 'path';
 
 import { CodeEntity, FileChunk, mergeFileChunks, getFileLanguage, Graph, QuestionContext } from './typeDefinitions';
 import { postMessage } from './benchmarkWebviewPanel';
-import { getGenerateAnswerPrompt, getExtractRelevantFileSnippetPrompt, getGeneratePointsPrompt } from './prompt';
+import { addLineNumber, getGenerateAnswerPrompt, getExtractRelevantFileSnippetPrompt, getGeneratePointsPrompt } from './prompt';
 import { logger, workspacePath } from './main';
 import { sleep } from "../utils";
 
@@ -95,7 +99,7 @@ class AnswerOutputParser extends BaseOutputParser {
             return text;
         }
 
-        return text.at(text.indexOf('Answer:')) as string;
+        return splits[1].trim() as string;
     }
 
     getFormatInstructions(options?: FormatInstructionsOptions): string {
@@ -111,9 +115,9 @@ class PointsOutputParser extends BaseOutputParser {
 
     async parse(text: string, callbacks?: Callbacks): Promise<string> {
 
-        if (text.startsWith('Evaluation Dimensions (Total: 10 points):')) {
-            return (text.at('Evaluation Dimensions (Total: 10 points):'.length) as string).trim();
-        }
+        // if (text.startsWith('Evaluation Dimensions (Total: 10 points):')) {
+        //     return (text.at('Evaluation Dimensions (Total: 10 points):'.length) as string).trim();
+        // }
 
         return text;
     }
@@ -134,8 +138,7 @@ export class ContextAgent {
 
     constructor() {
         this.model = new ChatDeepSeek({
-            // model: 'deepseek-chat',
-            model: 'deepseek-reasoner',
+            model: 'deepseek-chat',
             temperature: 0,
         });
 
@@ -172,11 +175,6 @@ export class ContextAgent {
             references: [],
             reason: '',
         };
-
-        if (path.basename(absoluteFilePath) !== 'trae_agent.py') {
-            context.reason = 'File is not a Python file';
-            return context;
-        }
 
         const content: string = readFileSync(absoluteFilePath, 'utf8');
 
@@ -290,15 +288,17 @@ export class ContextAgent {
 
 export class AnswerAgent {
 
-    model: ChatOpenAI;
+    model;
     prompt: ChatPromptTemplate;
     outputParser: AnswerOutputParser;
     chain: Runnable;
 
     constructor() {
-        this.model = new ChatDeepSeek({
-            model: 'deepseek-reasoner',
+
+        this.model = new ChatAlibabaTongyi({
+            model: 'qwen-plus-2025-07-28',
             temperature: 0,
+            maxTokens: 1000000,
         });
 
         this.prompt = ChatPromptTemplate.fromMessages([
@@ -319,37 +319,63 @@ export class AnswerAgent {
                 logger.log(input);
                 return input;
             }))
-            .pipe(this.model)
-            .pipe(RunnableLambda.from(async (output: any) => {
+            .pipe(RunnableLambda.from(async (input: any) => {
+                const systemMessage: string = input.messages[0]['content'];
+                const userMessage: string = input.messages[1]['content'];
+                const openai = new OpenAI(
+                    {
+                        apiKey: process.env.DASHSCOPE_API_KEY,
+                        baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+                    }
+                );
+                const completion = await openai.chat.completions.create({
+                    model: "qwen-plus-2025-07-28",  //此处以qwen-plus为例，可按需更换模型名称。模型列表：https://help.aliyun.com/zh/model-studio/getting-started/models
+                    messages: [
+                        { role: "system", content: systemMessage },
+                        { role: "user", content: userMessage }
+                    ],
+                    max_completion_tokens: 1000000,
+                });
+
+                return completion;
+            }))
+            // .pipe(this.model)
+            .pipe(RunnableLambda.from(async (output: OpenAI.Chat.Completions.ChatCompletion) => {
                 logger.log(output);
-                return output;
+                return output.choices[0].message.content;
             }))
             .pipe(this.outputParser);
     }
 
     async invoke(question: string, references: FileChunk[], workspacePath: string, repoName: string): Promise<string> {
 
-        const promptReferences: {
-            relativePathWithRepoName: string,
+        const promptReferences: Record<string, {
             content: string,
-            startLine: number,
             language: string,
-        }[] = [];
+        }> = {};
 
         references = mergeFileChunks(references);
 
         for (const reference of references) {
             const content: string = readFileSync(path.join(workspacePath, reference.relativePath), 'utf8');
-            promptReferences.push({
-                relativePathWithRepoName: path.join(repoName, reference.relativePath),
-                content: content,
-                startLine: reference.startLine,
-                language: getFileLanguage(reference.relativePath),
-            });
+            if (!(reference.relativePath in promptReferences)) {
+                promptReferences[reference.relativePath] = {
+                    content: addLineNumber(content.split('\n').slice(reference.startLine - 1, reference.endLine).join('\n'), reference.startLine - 1) + '\n...\n',
+                    language: getFileLanguage(reference.relativePath),
+                };
+            } else {
+                promptReferences[reference.relativePath].content += addLineNumber(content.split('\n').slice(reference.startLine - 1, reference.endLine).join('\n'), reference.startLine - 1) + '\n...\n';
+            }
         }
 
         const output: string = await this.chain.invoke({
-            input: getGenerateAnswerPrompt(question, repoName, promptReferences),
+            input: getGenerateAnswerPrompt(question, repoName, Object.entries(promptReferences).map(([key, value]) => {
+                return {
+                    relativePathWithRepoName: key,
+                    content: value.content,
+                    language: value.language,
+                };
+            })),
         });
 
         return output;
@@ -371,7 +397,7 @@ export class PointsAgent {
 
     constructor() {
         this.model = new ChatDeepSeek({
-            model: 'deepseek-reasoner',
+            model: 'deepseek-chat',
             temperature: 0,
         });
 
@@ -417,8 +443,8 @@ export class PointsAgent {
 
 }
 
-export async function testLLM(): Promise<string> {
-    
+export async function testDeepseek(): Promise<string> {
+
     const model = new ChatDeepSeek({
         model: 'deepseek-chat',
         temperature: 0,
@@ -443,4 +469,55 @@ export async function testLLM(): Promise<string> {
     console.log(`LLM output: ${msg}`);
 
     return msg.content as string;
+}
+
+async function testTongyi() {
+
+    // const model: ChatAlibabaTongyi = new ChatAlibabaTongyi({
+    //     model: 'qwen-plus',
+    //     temperature: 0,
+    // });
+
+    // const prompt = ChatPromptTemplate.fromMessages([
+    //     [
+    //         'system',
+    //         'You are an experienced codebase comprehension specialist.',
+    //     ],
+    //     [
+    //         'human',
+    //         '{input}',
+    //     ]
+    // ]);
+
+    // const chain = prompt.pipe(model);
+    // const msg: AIMessageChunk = await chain.invoke({
+    //     input: '你是什么模型？',
+    // });
+
+    // console.log(`LLM output: ${msg}`);
+
+    // return msg.content as string;
+
+    const openai = new OpenAI(
+        {
+            // 若没有配置环境变量，请用百炼API Key将下行替换为：apiKey: "sk-xxx",
+            apiKey: process.env.DASHSCOPE_API_KEY,
+            baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        }
+    );
+
+    const completion = await openai.chat.completions.create({
+        model: "qwen-plus-latest",  //此处以qwen-plus为例，可按需更换模型名称。模型列表：https://help.aliyun.com/zh/model-studio/getting-started/models
+        messages: [
+            { role: "system", content: "You are a helpful assistant." },
+            { role: "user", content: "你是谁？" }
+        ],
+    });
+    console.log(JSON.stringify(completion));
+
+    return JSON.stringify(completion);
+}
+
+export async function testLLM(): Promise<string> {
+    return await testTongyi();
 }
