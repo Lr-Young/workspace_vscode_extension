@@ -553,7 +553,6 @@ function init() {
 		(document.getElementById("button-timed-label") as Button).disabled = true;
 		(document.getElementById("button-timed-label") as Button).title = 'Waiting for labeling...';
 		const data: Record<string, string[]> = loadDataFromGrid('question-instances-grid');
-		const contextData: Record<string, string[]> = loadDataFromGrid('question-references-grid');
 		if (Object.keys(data).length === 0) {
 			vscode.postMessage({
 				command: 'error',
@@ -565,23 +564,10 @@ function init() {
 			(document.getElementById("button-timed-label") as Button).title = 'Timed Label References';
 			return;
 		}
-		if (Object.keys(contextData).length === 0) {
-			vscode.postMessage({
-				command: "label references",
-				questions: data['Question'],
-				currentFiles: [],
-			});
-		} else {
-			const questions: string[] = [];
-			const currentFiles: string[] = [];
-			contextData['Question'].forEach(q => {
-				
-			});
-			vscode.postMessage({
-				command: "label references",
-
-			});
-		}
+		vscode.postMessage({
+			command: "label references",
+			questions: data['Question']
+		});
 	};
 
 	(document.getElementById('button-generate-answer-points') as Button).onclick = async (event) => {

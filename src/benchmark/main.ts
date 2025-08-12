@@ -343,7 +343,7 @@ export async function labelRelevantContext(questions: string[]): Promise<void> {
                 });
 
                 await sleep(Math.floor(Math.random() * 500) + Math.floor(Math.random() * 500));
-                const context: QuestionContext = await agent.invoke(question, file, repoName, mergedGraph);
+                const context: QuestionContext = await agent.mockInvoke(question, file, repoName, mergedGraph);
                 references = mergeFileChunks([...references, ...context.references]);
                 if (context.references.length > 0) {
                     postMessage({
