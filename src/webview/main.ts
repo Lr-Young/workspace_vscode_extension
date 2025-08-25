@@ -16,6 +16,7 @@ let contextGridRowReasonVscodeLinkCount: number[] = [];
 let answerGridRowIndex: number = -1;
 let auto: boolean = false;
 let modifying: boolean = false;
+const autoSleepTime: number = 5000;
 
 // In order to use all the Webview UI Toolkit web components they
 // must be registered with the browser (i.e. webview) using the
@@ -470,6 +471,51 @@ async function gridDataToJson(): Promise<Record<string, Record<string, string[]>
 	return data;
 }
 
+function checkCompleteness(data: Record<string, Record<string, string[]>>): boolean {
+	console.log('checking data');
+	const gridTitles = {
+		'question-instances-grid': ['Question', 'Template', 'Placeholder Instance'],
+		'question-references-grid': ['Question', 'Reason'],
+		'answer-point-grid': ['Question', 'Answer', 'Evaluation'],
+	};
+
+	if (!('question-instances-grid' in data)) {
+		return false;
+	}
+	
+	if (!('Question' in data['question-instances-grid'])) {
+		return false;
+	}
+
+	let complete: boolean = true;
+
+	const length: number = data['question-instances-grid']['Question'].length;
+
+	Object.entries(gridTitles).forEach(([gridId, titles]) => {
+		if (!(gridId in data)) {
+			complete = false;
+		} else {
+			titles.forEach(title => {
+				if (!(title in data[gridId])) {
+					complete = false;
+				} else {
+					let count = 0;
+					data[gridId][title].forEach(content => {
+						if (content !== '') {
+							count++;
+						}
+					});
+					if (count !== length) {
+						complete = false;
+					}
+				}
+			});
+		}
+	});
+
+	return complete;
+}
+
 async function jsonToGridData(data: Record<string, Record<string, string[]>>, workspacePath: string): Promise<void> {
 	const gridIds = [
 		'placeholder-instances-grid',
@@ -536,6 +582,15 @@ function test(content: string): void {
 function init() {
 
 	// loadData();
+
+	const navbar = document.querySelector('.navbar') as HTMLElement;
+    const mainContent = document.querySelector('.main-content') as HTMLElement;
+    
+    // 获取导航栏的总高度（包括 padding）
+    const navbarHeight = navbar.offsetHeight;
+    
+    // 设置内容区域的 padding-top
+    mainContent.style.paddingTop = `${navbarHeight}px`;
 
 	(document.getElementById("button-instantiate-questions") as Button).onclick = (event) => {
 		(document.getElementById("button-instantiate-questions") as Button).disabled = true;
@@ -660,6 +715,7 @@ function init() {
 
 	(document.getElementById('button-auto') as Button).onclick = async (event) => {
 		(document.getElementById("button-auto") as Button).disabled = true;
+		(document.getElementById("button-timed-auto") as Button).disabled = true;
 		(document.getElementById("button-auto") as Button).title = 'In Process...';
 		vscode.postMessage({
 			command: "auto",
@@ -760,6 +816,45 @@ function init() {
 		(document.getElementById('button-timed-label') as Button).disabled = true;
 	};
 
+	(document.getElementById('button-timed-auto') as Button).onclick = (event) => {
+		const startHour: number = parseInt(hoursSelectBegin?.value || '0');
+		const startMinute: number = parseInt(minutesSelectBegin?.value || '0');
+		const endHour: number = parseInt(hoursSelectEnd?.value || '0');
+		const endMinute: number = parseInt(minutesSelectEnd?.value || '0');
+
+		if (startHour === endHour && startMinute === endMinute) {
+			vscode.postMessage({
+				command: 'error',
+				message: 'Start time and end time cannot be the same',
+			});
+			return;
+		}
+
+		const chosenTimeDiv = (document.getElementById('chosen-time') as HTMLElement);
+		chosenTimeDiv.style.display = 'block';
+		chosenTimeDiv.innerHTML = `Start Time: ${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')} - End Time: ${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`;
+
+		executeInTimeRange(
+			() => {
+				console.log('call auto');
+				(document.getElementById("button-auto") as Button).click();
+			},
+			startHour,
+			startMinute,
+			endHour,
+			endMinute,
+			(msg: string) => {
+				vscode.postMessage({
+					command: 'info',
+					message: msg,
+				});
+			}
+		);
+
+		(document.getElementById('button-timed-auto') as Button).disabled = true;
+		// (document.getElementById('button-auto') as Button).disabled = true;
+	};
+
 	(document.getElementById("button-test-llm") as Button).onclick = (event) => {
 		vscode.postMessage({
 			command: "testButton",
@@ -774,7 +869,14 @@ function init() {
 				(document.getElementById('button-instantiate-questions') as Button).click();
 				break;
 			}
+			case 'auto done': {
+				auto = false;
+				(document.getElementById('button-auto') as Button).disabled = false;
+				(document.getElementById('button-timed-auto') as Button).disabled = false;
+				break;
+			}
 			case 'instantiate questions begin': {
+				(document.getElementById('current-workspace-path') as HTMLElement).textContent = `Current Workspace Path: ${message.workspacePath}`;
 				(document.getElementById('placeholder-instantiation-checkbox') as HTMLElement).innerHTML = 'Placeholder Instantiating...';
 				(document.getElementById('placeholder-instantiation-progress-wrapper') as HTMLElement).style.display = 'block';
 				(document.getElementById("button-load-file") as Button).disabled = true;
@@ -851,7 +953,7 @@ function init() {
 				(document.getElementById("button-load-file") as Button).disabled = false;
 				(document.getElementById("button-save-file") as Button).disabled = false;
 				if (auto) {
-					await sleep(5000);
+					await sleep(autoSleepTime);
 					(document.getElementById('button-label-reference') as Button).click();
 				}
 				break;
@@ -859,6 +961,7 @@ function init() {
 			case 'benchmark references': {
 				switch (message.type) {
 					case 'init': {
+						(document.getElementById('current-workspace-path') as HTMLElement).textContent = `Current Workspace Path: ${message.workspacePath}`;
 						contextGridRowReasonVscodeLinkCount = Array(message.questions.length).fill(0);
 						(document.getElementById("button-load-file") as Button).disabled = true;
 						(document.getElementById("button-save-file") as Button).disabled = true;
@@ -942,9 +1045,8 @@ function init() {
 						(document.getElementById("button-load-file") as Button).disabled = false;
 						(document.getElementById("button-save-file") as Button).disabled = false;
 						(document.getElementById('button-modify-references') as Button)!.disabled = false;
-						(document.getElementById('button-save-default-file') as Button).click();
 						if (auto) {
-							await sleep(5000);
+							await sleep(autoSleepTime);
 							(document.getElementById('button-generate-answer-points') as Button).click();
 						}
 						break;
@@ -955,6 +1057,7 @@ function init() {
 			case 'benchmark answer': {
 				switch (message.type) {
 					case 'init': {
+						(document.getElementById('current-workspace-path') as HTMLElement).textContent = `Current Workspace Path: ${message.workspacePath}`;
 						(document.getElementById('answer-point-grid') as HTMLElement).style.display = 'block';
 						(document.getElementById("button-load-file") as Button).disabled = true;
 						(document.getElementById("button-save-file") as Button).disabled = true;
@@ -972,8 +1075,21 @@ function init() {
 						(document.getElementById("button-load-file") as Button).disabled = false;
 						(document.getElementById("button-save-file") as Button).disabled = false;
 						if (auto) {
-							await sleep(5000);
-							(document.getElementById('button-save-default-file') as Button).click();
+							await sleep(autoSleepTime);
+							if (modifying) {
+								removeVscodeLinkCheckOption();
+								(document.getElementById('button-modify-references') as Button).innerText = 'Modify References';
+								modifying = false;
+							}
+							let data: Record<string, Record<string, string[]>> = await gridDataToJson();
+							while (!checkCompleteness(data)) {
+								await sleep(1000);
+								data = await gridDataToJson();
+							}
+							vscode.postMessage({
+								command: "save default file",
+								data: data,
+							});
 						}
 						break;
 					}
@@ -1017,8 +1133,18 @@ function init() {
 				(document.getElementById("button-export-excel") as Button).disabled = false;
 				break;
 			}
-			case 'save default file': {
+			case 'save default file failed': {
 				(document.getElementById("button-save-default-file") as Button).disabled = false;
+				break;
+			}
+			case 'save default file done': {
+				(document.getElementById("button-save-default-file") as Button).disabled = false;
+				if (auto) {
+					await sleep(autoSleepTime);
+					vscode.postMessage({
+						command: 'auto increase index',
+					});
+				}
 				break;
 			}
 			case 'add reference': {

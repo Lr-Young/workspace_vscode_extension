@@ -45,6 +45,20 @@ These are the only relevant code spans needed to understand the implementation o
 ]
 `.trim();
 
+const MOCK_CONTEXT_ANSWER2: string = `
+[Analysis]
+The question is about the role of the directory \`src\` in the codebase \`xai-sdk-python\`. Looking at the provided file path and content, the main file is located at \`xai-sdk-python\\src\\xai_sdk\\__init__.py\`. This file is inside the \`src\` directory, which suggests that \`src\` is the root directory for the source code of the \`xai_sdk\` package. The \`__init__.py\` file imports modules \`aio\` and \`sync\` (line 1), imports \`__version__\` from \`__about__\` (line 2), and imports \`AsyncClient\` and \`Client\` from submodules (lines 3-4). It also defines \`__all__\` (line 6). Since the question is about the directory \`src\`, and the provided file is within it, the entire content of this file is relevant as it represents the top-level package initialization for \`xai_sdk\`, which is housed under \`src\`. There are no dependent files provided, so no additional spans are needed.
+
+[Answer]
+[
+  { "filename": "xai-sdk-python\\\\src\\\\xai_sdk\\\\__init__.py", "start": 6, "end": 6 },
+  { "filename": "xai-sdk-python\\\\src\\\\xai_sdk\\\\__init__.py", "start": 1, "end": 7 },
+  { "filename": "xai-sdk-python\\\\src\\\\xai_sdk\\\\__init__.py", "start": 1, "end": 1 },
+  { "filename": "xai-sdk-python\\\\src\\\\xai_sdk\\\\__init__.py", "start": 3, "end": 3 },
+  { "filename": "xai-sdk-python\\\\src\\\\xai_sdk\\\\__init__.py", "start": 4, "end": 6 }
+]
+`.trim();
+
 class QuestionContextOutputParser extends BaseOutputParser {
 
     lc_namespace: string[] = ['workspace_benchmark'];
@@ -161,7 +175,7 @@ export class ContextAgent {
                 return input;
             }))
             .pipe(this.model)
-            // .pipe(() => MOCK_CONTEXT_ANSWER)
+            // .pipe(() => MOCK_CONTEXT_ANSWER2)
             .pipe(RunnableLambda.from(async (output: any) => {
                 logger.log(output);
                 return output;
@@ -204,6 +218,8 @@ export class ContextAgent {
         const output: ParseOutput = await this.chain.invoke({
             input: getExtractRelevantFileSnippetPrompt(question, relativePathWithRepoName, content, repoName, dependentCode),
         });
+
+        // const output: ParseOutput = {success: true, ranges: [], reason: "Mock reason for labeling"};
 
         if (!output.success) {
             postMessage({

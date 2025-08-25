@@ -148,3 +148,68 @@ export async function executeInTimeRange(
     log(`已进入目标时间段：${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')} - ${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}，执行回调函数...`);
     await callback();
 }
+
+/**
+ * 比较两个 Record<string, Set<string>> 对象是否完全相同
+ * @param record1 第一个记录对象
+ * @param record2 第二个记录对象
+ * @returns 如果两个记录的所有键和对应的 Set 内容完全相同则返回 true，否则返回 false
+ */
+export function areRecordSetsEqual(
+    record1: Record<string, Set<string>>,
+    record2: Record<string, Set<string>>
+): boolean {
+    // 获取两个记录的所有键
+    const keys1 = Object.keys(record1);
+    const keys2 = Object.keys(record2);
+
+    // 首先检查键的数量是否相同
+    if (keys1.length !== keys2.length) {
+        return false;
+    }
+
+    // 检查所有键是否相同（包括键的顺序）
+    for (const key of keys1) {
+        if (!(key in record2)) {
+            return false;
+        }
+    }
+
+    // 检查每个键对应的 Set 是否相同
+    for (const key of keys1) {
+        const set1 = record1[key];
+        const set2 = record2[key];
+
+        // 比较 Set 的大小
+        if (set1.size !== set2.size) {
+            return false;
+        }
+
+        // 比较 Set 中的每个元素
+        for (const item of set1) {
+            if (!set2.has(item)) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+/**
+ * 深拷贝一个 Record<string, Set<string>> 对象
+ * @param original 原始对象
+ * @returns 深拷贝后的新对象
+ */
+export function deepCopyRecordSet(original: Record<string, Set<string>>): Record<string, Set<string>> {
+    const copy: Record<string, Set<string>> = {};
+    
+    for (const key in original) {
+        if (original.hasOwnProperty(key)) {
+            // 为每个键创建一个新的 Set，并复制所有元素
+            copy[key] = new Set<string>(original[key]);
+        }
+    }
+    
+    return copy;
+}

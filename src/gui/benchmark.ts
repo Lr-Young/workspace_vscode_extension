@@ -80,57 +80,15 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
 
         <vscode-button appearance="primary" id="button-modify-references">Modify References</vscode-button>
 
+        <vscode-button appearance="primary" id="button-timed-auto">Timed Auto</vscode-button>
+
         <vscode-button appearance="primary" id="button-export-json">Export Json</vscode-button>
 
         <vscode-button appearance="primary" id="button-export-excel">Export Excel</vscode-button>
 
         <vscode-button appearance="primary" id="button-test-llm">Test LLM</vscode-button>
 
-    </div>
-
-    <h1>Workspace Benchmark Dataset</h1>
-    <vscode-divider role="separator"></vscode-divider>
-
-    <!--
-    <svg></svg>
-    <div id="tooltip" style="display: none;"></div>
-    -->
-
-    <section class="component-container">
-
-        <h2>Step 1: Placeholder and Question Instantiation</h2>
-
-        <div class="horizontal progress">
-            <vscode-checkbox readonly id="placeholder-instantiation-checkbox">Placeholder And Question Instantiation</vscode-checkbox>
-            <div class="progress-container hidden" id="placeholder-instantiation-progress-wrapper">
-                <div class="progress-bar" id="placeholder-instantiation-progress-bar">0%</div>
-            </div>
-        </div>
-
-        <div class="horizontal">
-            <p>Number of Questions to Instantiate</p>
-            <vscode-text-field type="number" min="1" value="10" id="instantiate-questions-number"></vscode-text-field>
-            <vscode-button appearance="primary" id="button-instantiate-questions">Instantiate Questions</vscode-button>
-        </div>
-
-        <vscode-data-grid class="hidden" id="placeholder-instances-grid" grid-template-columns="1fr 10fr"></vscode-data-grid>
-
-        <vscode-data-grid class="hidden" id="question-instances-grid" grid-template-columns="1fr 1fr 1fr"></vscode-data-grid>
-
-    </section>
-
-    <vscode-divider role="separator"></vscode-divider>
-
-    <section class="component-container">
-        <h2>Step 2: Label Question Context Instantiation</h2>
-
-        <vscode-checkbox readonly id="reference-checkbox">Label Question References</vscode-checkbox>
-
-        <vscode-button title="Please Finish Step 1" appearance="primary" id="button-label-reference">Label References</vscode-button>
-
-        <vscode-divider role="separator"></vscode-divider>
-
-        <vscode-button appearance="primary" id="button-timed-label">Timed Label References</vscode-button>
+        <br></br>
 
         <div class="time-picker">
             <label for="hours">Begin Time : Hour</label>
@@ -165,6 +123,55 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
         <div id="chosen-time" class="hidden">
 
         </div>
+
+    </div>
+
+<div class="main-content">
+
+    <h1>Workspace Benchmark Dataset</h1>
+    <div id="current-workspace-path">Current Workspace Path:</div>
+    <vscode-divider role="separator"></vscode-divider>
+
+    <!--
+    <svg></svg>
+    <div id="tooltip" style="display: none;"></div>
+    -->
+
+    <section class="component-container">
+
+        <h2>Step 1: Placeholder and Question Instantiation</h2>
+
+        <div class="horizontal progress">
+            <vscode-checkbox readonly id="placeholder-instantiation-checkbox">Placeholder And Question Instantiation</vscode-checkbox>
+            <div class="progress-container hidden" id="placeholder-instantiation-progress-wrapper">
+                <div class="progress-bar" id="placeholder-instantiation-progress-bar">0%</div>
+            </div>
+        </div>
+
+        <div class="horizontal">
+            <p>Number of Questions to Instantiate</p>
+            <vscode-text-field type="number" min="1" value="20" id="instantiate-questions-number"></vscode-text-field>
+            <vscode-button appearance="primary" id="button-instantiate-questions">Instantiate Questions</vscode-button>
+        </div>
+
+        <vscode-data-grid class="hidden" id="placeholder-instances-grid" grid-template-columns="1fr 10fr"></vscode-data-grid>
+
+        <vscode-data-grid class="hidden" id="question-instances-grid" grid-template-columns="1fr 1fr 1fr"></vscode-data-grid>
+
+    </section>
+
+    <vscode-divider role="separator"></vscode-divider>
+
+    <section class="component-container">
+        <h2>Step 2: Label Question Context Instantiation</h2>
+
+        <vscode-checkbox readonly id="reference-checkbox">Label Question References</vscode-checkbox>
+
+        <vscode-button title="Please Finish Step 1" appearance="primary" id="button-label-reference">Label References</vscode-button>
+
+        <vscode-divider role="separator"></vscode-divider>
+
+        <vscode-button appearance="primary" id="button-timed-label">Timed Label References</vscode-button>
         
         <vscode-data-grid class="hidden" id="question-references-grid" grid-template-columns="1fr 1fr 2fr"></vscode-data-grid>
 
@@ -186,6 +193,7 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
     <vscode-divider role="separator"></vscode-divider>
 
     <script type="module" nonce="${nonce}" src="${webviewUri}"></script>
+</div>
 </body>
 
 </html>

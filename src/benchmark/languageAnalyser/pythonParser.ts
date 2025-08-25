@@ -1,7 +1,7 @@
 
 import { CodeChunk, CodeParser, dotsToPath, Language, location } from './parser';
 import { CodeEntity, Graph, graphToString, Placeholder, PlaceholderInstance } from '../typeDefinitions';
-import { pathToDots } from '../../utils';
+import { areRecordSetsEqual, deepCopyRecordSet, pathToDots } from '../../utils';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -228,11 +228,11 @@ export class PythonCodeParser implements CodeParser {
 		return;
 	}
 
-	gatherEdges(files: string[], graph: Graph): void {
+	gatherEdges(files: string[], graph: Graph, initFileNodes: Record<string, Record<string, string>>): void {
 
 		const importedIdentifiers: Record<string, string> = {};
 
-		const initFileNodes: Record<string, Record<string, string>> = {};
+		const importedFiles: Record<string, string> = {};  // {modulename, fqn for module}
 
 		function addInitFileNode(fileRelativePath: string, identifier: string, fqn: string): void {
 			if (!(fileRelativePath in initFileNodes)) {
@@ -247,6 +247,95 @@ export class PythonCodeParser implements CodeParser {
 			if (identifier in importedIdentifiers) {
 				graph.fileImportNodes[fileRelativePath].add(importedIdentifiers[identifier]);
 			}
+		}
+
+		function handleImportStatement(node: Parser.SyntaxNode): void {
+			if (node.type !== 'import_statement') {
+				return;
+			}
+
+			debug(`${handleImportStatement.name}`, node);
+
+			const modules = node.childrenForFieldName('name');
+
+			modules.forEach(module => {
+				let moduleName: string = '';
+				let reprModuleName: string = '';
+				if (module.type === 'dotted_name') {
+					reprModuleName = module.text;
+					moduleName = module.text;
+				} else if (module.type === 'aliased_import') {
+					if (module.childForFieldName('name') === null || module.childForFieldName('alias') === null) {
+						return;
+					}
+					reprModuleName = module.childForFieldName('alias')!.text;
+					moduleName = module.childForFieldName('name')!.text;
+				} else {
+					return;
+				}
+				let importedFile: string;
+
+				let leadingDotCount = 0;
+
+				while (moduleName.length > leadingDotCount && moduleName[leadingDotCount] === '.') {
+					leadingDotCount++;
+				}
+
+				if (leadingDotCount === 0) {
+					importedFile = path.join(dotsToPath(moduleName), '__init__.py');
+					let found = false;
+					if (!found) {
+						// check from current directory to top directory
+						let currentDirectory: string = path.dirname(fileRelativePath);
+						let skip = false;
+						while (true) {
+							if (currentDirectory === '.') {
+								skip = true;
+							}
+							importedFile = path.join(currentDirectory, `${path.join(dotsToPath(moduleName), '__init__.py')}`);
+							if (importedFile in graph.fileNodes) {
+								found = true;
+								break;
+							}
+							currentDirectory = path.dirname(currentDirectory);
+							if (skip) {
+								break;
+							}
+						}
+					}
+					if (!found) {
+						// check from current directory to top directory
+						let currentDirectory: string = path.dirname(fileRelativePath);
+						let skip = false;
+						while (true) {
+							if (currentDirectory === '.') {
+								skip = true;
+							}
+							importedFile = path.join(currentDirectory, `${dotsToPath(moduleName)}.py`);
+							if (importedFile in graph.fileNodes) {
+								found = true;
+								break;
+							}
+							currentDirectory = path.dirname(currentDirectory);
+							if (skip) {
+								break;
+							}
+						}
+					}
+					if (!found) {
+						return;
+					}
+				} else {
+					importedFile = path.relative(workspacePath, `${dotsToPath(moduleName, path.join(workspacePath, path.dirname(fileRelativePath)))}`);
+					if (Object.keys(graph.fileNodes).includes(`${importedFile}.py`)) {
+						importedFile += '.py';
+					} else {
+						importedFile = path.join(importedFile, '__init__.py');
+					}
+				}
+				importedFiles[reprModuleName] = importedFile;
+			});
+
 		}
 
 		function handleImportFromStatement(node: Parser.SyntaxNode): void {
@@ -275,19 +364,40 @@ export class PythonCodeParser implements CodeParser {
 			if (leadingDotCount === 0) {
 				importedFile = path.join(dotsToPath(moduleName), '__init__.py');
 				let found = false;
-				for (const file of Object.keys(graph.fileNodes)) {
-					if (file.includes(importedFile)) {
-						importedFile = file;
-						found = true;
-						break;
+				if (!found) {
+					// check from current directory to top directory
+					let currentDirectory: string = path.dirname(fileRelativePath);
+					let skip = false;
+					while (true) {
+						if (currentDirectory === '.') {
+							skip = true;
+						}
+						importedFile = path.join(currentDirectory, `${path.join(dotsToPath(moduleName), '__init__.py')}`);
+						if (importedFile in graph.fileNodes) {
+							found = true;
+							break;
+						}
+						currentDirectory = path.dirname(currentDirectory);
+						if (skip) {
+							break;
+						}
 					}
 				}
 				if (!found) {
-					importedFile = `${path.dirname(importedFile)}.py`;
-					for (const file of Object.keys(graph.fileNodes)) {
-						if (file.includes(importedFile)) {
-							importedFile = file;
+					// check from current directory to top directory
+					let currentDirectory: string = path.dirname(fileRelativePath);
+					let skip = false;
+					while (true) {
+						if (currentDirectory === '.') {
+							skip = true;
+						}
+						importedFile = path.join(currentDirectory, `${dotsToPath(moduleName)}.py`);
+						if (importedFile in graph.fileNodes) {
 							found = true;
+							break;
+						}
+						currentDirectory = path.dirname(currentDirectory);
+						if (skip) {
 							break;
 						}
 					}
@@ -306,6 +416,7 @@ export class PythonCodeParser implements CodeParser {
 
 			const isInitFile: boolean = path.basename(fileRelativePath) === '__init__.py';
 			const importIsInitFile: boolean = path.basename(importedFile) === '__init__.py';
+
 			if (nameNodes.length === 0) {
 				graph.fileNodes[importedFile].forEach(fqn => {
 					if (isInitFile) {
@@ -314,6 +425,9 @@ export class PythonCodeParser implements CodeParser {
 					importedIdentifiers[fqn.split('.')[-1]] = fqn;
 				});
 				if (importIsInitFile) {
+					if (!(importedFile in initFileNodes)) {
+						return;
+					}
 					Object.entries(initFileNodes[importedFile]).forEach(([identifier, fqn]) => {
 						importedIdentifiers[identifier] = fqn;
 					});
@@ -323,6 +437,9 @@ export class PythonCodeParser implements CodeParser {
 				nameNodes.forEach(nameNode => {
 					if (nameNode.type === 'dotted_name') {
 						const identifier = nameNode.text.split('.')[0];
+						if (importIsInitFile && !(importedFile in initFileNodes)) {
+							return;
+						}
 						if (importIsInitFile && identifier in initFileNodes[importedFile]) {
 							importedIdentifiers[identifier] = initFileNodes[importedFile][nameNode.text];
 							if (isInitFile) {
@@ -340,6 +457,9 @@ export class PythonCodeParser implements CodeParser {
 						if (childNameNode !== null && childAliasNode !== null) {
 							const identifier = childNameNode.text.split('.')[0];
 							const aliasIdentifier = childAliasNode.text;
+							if (importIsInitFile && !(importedFile in initFileNodes)) {
+								return;
+							}
 							if (importIsInitFile && identifier in initFileNodes[importedFile]) {
 								importedIdentifiers[aliasIdentifier] = initFileNodes[importedFile][childNameNode.text];
 								if (isInitFile) {
@@ -484,6 +604,10 @@ export class PythonCodeParser implements CodeParser {
 				}
 				case 'import_from_statement': {
 					handleImportFromStatement(node);
+					break;
+				}
+				case 'import_statement': {
+					handleImportStatement(node);
 					break;
 				}
 				case 'assert_statement': {
@@ -802,6 +926,16 @@ export class PythonCodeParser implements CodeParser {
 			const objectNode = node.childForFieldName('object');
 			if (objectNode !== null) {
 				handleValue(objectNode);
+				const attributeNode = node.childForFieldName('attribute');
+				if (attributeNode !== null && objectNode.text in importedFiles && importedFiles[objectNode.text] in graph.fileNodes) {
+					for (let fqn of graph.fileNodes[importedFiles[objectNode.text]]) {
+						if (fqn.includes(node.text)) {
+							importedIdentifiers[node.text] = fqn;
+							addEdge(node.text);
+							break;
+						}
+					}
+				}
 			}
 		}
 
@@ -906,6 +1040,8 @@ export class PythonCodeParser implements CodeParser {
 					handleYield(childNode);
 				} else if (childNode.type === 'await') {
 					handleAwait(childNode);
+				} else if (childNode.type === 'call') {
+					handleCall(childNode);
 				}
 			}
 		}
@@ -1114,11 +1250,23 @@ export class PythonCodeParser implements CodeParser {
 			Object.keys(importedIdentifiers).forEach(key => {
 				delete importedIdentifiers[key];
 			});
+
+			Object.keys(importedFiles).forEach(key => {
+				delete importedFiles[key];
+			});
 			
 			const content = fs.readFileSync(filePath, 'utf8');
 			const tree = this.parser.parse(content);
+
+			if (fileRelativePath === 'src\\main.py') {
+				DEBUG = false;
+			}
 			
 			handleModule(tree.rootNode);
+
+			if (fileRelativePath === 'src\\main.py') {
+				DEBUG = false;
+			}
 
 		}
 
@@ -1134,12 +1282,24 @@ export class PythonCodeParser implements CodeParser {
 			Object.keys(importedIdentifiers).forEach(key => {
 				delete importedIdentifiers[key];
 			});
+
+			Object.keys(importedFiles).forEach(key => {
+				delete importedFiles[key];
+			});
 			
 			fileRelativePath = path.relative(workspacePath, filePath);
 			const content = fs.readFileSync(filePath, 'utf8');
 			const tree = this.parser.parse(content);
+
+			if (fileRelativePath === 'src\\agents\\analyzer.py') {
+				DEBUG = false;
+			}
 			
 			handleModule(tree.rootNode);
+
+			if (fileRelativePath === 'src\\agents\\analyzer.py') {
+				DEBUG = false;
+			}
 			
 		}
 	}
@@ -1153,12 +1313,30 @@ export class PythonCodeParser implements CodeParser {
 
 		const graphFilePath = path.join(workspacePath, '.workspace_benchmark/graph.json');
 
-		fs.writeFileSync(graphFilePath, '');
-
 		this.gatherNodes(files, graph);
+		
+		fs.writeFileSync(graphFilePath, '');
+		fs.appendFileSync(graphFilePath, graphToString(graph));
 
-		this.gatherEdges(files, graph);
+		const initFileNodes: Record<string, Record<string, string>> = {};
 
+		let fileImportNodes: Record<string, Set<string>>;
+
+		do {
+			fileImportNodes = deepCopyRecordSet(graph.fileImportNodes);
+			this.gatherEdges(files, graph, initFileNodes);
+		} while (!areRecordSetsEqual(fileImportNodes, graph.fileImportNodes));
+
+		Object.entries(graph.fileImportNodes).forEach(([file, fqns]) => {
+			fqns.forEach(fqn => {
+				if (!(Object.keys(graph.nodes).includes(fqn))) {
+					graph.fileImportNodes[file].delete(fqn);
+					console.log(`erased ${fqn}`);
+				}
+			});
+		});
+
+		fs.writeFileSync(graphFilePath, '');
 		fs.appendFileSync(graphFilePath, graphToString(graph));
 
 		return graph;

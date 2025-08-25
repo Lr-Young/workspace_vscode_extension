@@ -43,19 +43,27 @@ export let workspacePath: string = '';
 let repoName: string = '';
 export let logger: LLMLogger;
 
+let workspaceFolderIndex: number = 0;
+
 function checkWorkspaceFolder(): boolean {
-    if (vscode.workspace.workspaceFolders === undefined || vscode.workspace.workspaceFolders.length !== 1) {
-        vscode.window.showErrorMessage("Please Open a directory in the Workspace");
+    if (vscode.workspace.workspaceFolders === undefined || vscode.workspace.workspaceFolders.length <= workspaceFolderIndex) {
+        vscode.window.showErrorMessage(`Please Open ${workspaceFolderIndex + 1} directories in the Workspace`);
         postMessage({
             command: 'benchmark fail',
             type: 'workspace folder not one',
-            error: 'Please Make Sure there is only one directory in the worksapce'
+            error: `Please Make Sure there are at least ${workspaceFolderIndex + 1} directory in the worksapce`
         });
         return false;
     }
 
-    workspacePath = `${vscode.workspace.workspaceFolders[0].uri.fsPath}${path.sep}`;
-    repoName = vscode.workspace.workspaceFolders[0].name;
+    workspacePath = `${vscode.workspace.workspaceFolders[workspaceFolderIndex].uri.fsPath}${path.sep}`;
+    repoName = vscode.workspace.workspaceFolders[workspaceFolderIndex].name;
+
+    const workspaceDirectory = path.join(workspacePath, '.workspace_benchmark');
+
+    if (!fs.existsSync(workspaceDirectory)) {
+        fs.mkdirSync(workspaceDirectory, { recursive: true });
+    }
 
     logger = LLMLogger.getInstance(workspacePath);
 
@@ -264,7 +272,10 @@ export async function instantiateQuestions(questionNum: number) {
         return;
     }
 
-    postMessage({ command: 'instantiate questions begin' });
+    postMessage({
+        command: 'instantiate questions begin',
+        workspacePath: workspacePath,
+    });
 
     const instances = await getPlaceholderInstances();
 
@@ -292,6 +303,7 @@ export async function labelRelevantContext(questions: string[]): Promise<void> {
         command: 'benchmark references',
         type: 'init',
         questions: questions,
+        workspacePath: workspacePath,
     });
 
     const questionCount = questions.length;
@@ -343,7 +355,7 @@ export async function labelRelevantContext(questions: string[]): Promise<void> {
                 });
 
                 await sleep(Math.floor(Math.random() * 500) + Math.floor(Math.random() * 500));
-                const context: QuestionContext = await agent.mockInvoke(question, file, repoName, mergedGraph);
+                const context: QuestionContext = await agent.invoke(question, file, repoName, mergedGraph);
                 references = mergeFileChunks([...references, ...context.references]);
                 if (context.references.length > 0) {
                     postMessage({
@@ -387,6 +399,7 @@ export async function generateAnswerAndPoints(data: Record<string, string[]>): P
     postMessage({
         command: 'benchmark answer',
         type: 'init',
+        workspacePath: workspacePath,
     });
 
     const pattern = /^<vscode-link[^>]*>([^:]*):(\d+)~(\d+)<\/vscode-link>$/;
@@ -446,9 +459,9 @@ export async function generateAnswerAndPoints(data: Record<string, string[]>): P
         });
 
         tasks.push(async ()=> {
-            await sleep(Math.floor(Math.random() * 500) + Math.floor(Math.random() * 500));
+            await sleep(Math.floor(Math.random() * 5000) + Math.floor(Math.random() * 500));
             const answer: string = await answerAgent.invoke(questions[i], references[i], workspacePath, repoName);
-            await sleep(Math.floor(Math.random() * 500) + Math.floor(Math.random() * 500));
+            await sleep(Math.floor(Math.random() * 5000) + Math.floor(Math.random() * 500));
             const points: string = await pointsAgent.invoke(questions[i], answer);
             postMessage({
                 command: 'benchmark answer',
@@ -684,7 +697,7 @@ export async function saveJsonDataDefault(data: any) {
     if (Object.keys(data).length === 0) {
         vscode.window.showErrorMessage('No Data to Save, Please Fill Data in the Grid First');
         postMessage({
-            command: 'save default file',
+            command: 'save default file failed',
         });
         return;
     }
@@ -699,11 +712,15 @@ export async function saveJsonDataDefault(data: any) {
             Buffer.from(JSON.stringify(data, null, 2))
         );
         vscode.window.showInformationMessage('File saved successfully');
+        postMessage({
+            command: 'save default file done',
+        });
+        return;
     } catch (error) {
         vscode.window.showErrorMessage(`Fail to save file: ${error}`);
     }
     postMessage({
-        command: 'save default file',
+        command: 'save default file failed',
     });
 }
 
@@ -773,6 +790,22 @@ export async function loadJsonData(): Promise<void> {
 }
 
 export async function auto() {
+    workspaceFolderIndex = 0;
+    console.log('auto begin');
+    postMessage({
+        command: 'auto',
+    });
+}
+
+export function autoIncreaseIndex() {
+    workspaceFolderIndex++;
+    if (vscode.workspace.workspaceFolders === undefined || workspaceFolderIndex >= vscode.workspace.workspaceFolders.length) {
+        workspaceFolderIndex = 0;
+        postMessage({
+            command: 'auto done',
+        });
+        return;
+    }
     postMessage({
         command: 'auto',
     });
