@@ -230,6 +230,21 @@ const extensionToLanguageMap: Record<string, string> = {
 	'env': 'Environment Variables'
 };
 
+export const unreadableFileTypes: string[] = [
+	'.ardupilot',
+	'.bag',
+	'.bin',
+	'.db3',
+	'.gif',
+	'.mcap',
+	'.png',
+	'.px4',
+	'.ulg',
+	'.pdf',
+	'.jpeg',
+	'.jpg'
+];
+
 export function getFileLanguage(filePath: string): string {
 	const lastDotIndex = filePath.lastIndexOf('.');
 	if (lastDotIndex === -1 || lastDotIndex === 0) {

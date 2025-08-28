@@ -861,6 +861,12 @@ function init() {
 		});
 	};
 
+	(document.getElementById('button-fetch-file-types') as Button).onclick = (event) => {
+		vscode.postMessage({
+			command: "fetch file types",
+		});
+	};
+
 	window.addEventListener('message', async event => {
 		const message = event.data;
 		switch (message.command) {

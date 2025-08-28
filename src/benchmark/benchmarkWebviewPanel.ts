@@ -1,6 +1,6 @@
 import { Disposable, Uri, Webview, WebviewPanel, window, ViewColumn } from "vscode";
 import { getWebviewContent } from "../gui/benchmark";
-import { auto, autoIncreaseIndex, checkReference, constructBenchmark, exportExcel, exportJson, generateAnswerAndPoints, instantiateQuestions, labelRelevantContext, loadJsonData, saveJsonData, saveJsonDataDefault } from "../benchmark/main";
+import { auto, autoIncreaseIndex, checkReference, constructBenchmark, exportExcel, exportJson, fetchAllFileTypes, generateAnswerAndPoints, instantiateQuestions, labelRelevantContext, loadJsonData, saveJsonData, saveJsonDataDefault } from "../benchmark/main";
 import { handleLink } from './main';
 
 import { testLLM } from './llm';
@@ -79,6 +79,9 @@ export class BenchmarkWebviewPanel {
 						return;
 					case 'auto increase index':
 						autoIncreaseIndex();
+						return;
+					case 'fetch file types':
+						await fetchAllFileTypes();
 						return;
 				}
 			}

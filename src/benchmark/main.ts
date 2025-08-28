@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import * as XLSX from 'xlsx';
 
 import { concurrencyRun, shuffle } from '../utils';
-import { FileChunk, Graph, mergeGraph, mergeFileChunks, Placeholder, PlaceholderInstance, QuestionContext, QuestionInstance, QuestionTemplate, supportedLanguages, GridType, GRID_STRUCTURES } from './typeDefinitions';
+import { FileChunk, Graph, mergeGraph, mergeFileChunks, Placeholder, PlaceholderInstance, QuestionContext, QuestionInstance, QuestionTemplate, supportedLanguages, GridType, GRID_STRUCTURES, unreadableFileTypes } from './typeDefinitions';
 import { buildGraphs, parsePlaceholderInstance } from './languageAnalyser/parser';
 import { fileFormatDateTime, LLMLogger } from '../logger';
 import { sleep } from '../utils';
@@ -240,6 +240,8 @@ function instantiate(questionNum: number, placeHolderInstances: PlaceholderInsta
 
     let templateIndex = 0;
 
+    const questionsSet: string[] = [];
+
     while (questions.length < questionNum) {
         const template = questionTemplates[templateIndex];
         const selector = selectors[template.placeholder];
@@ -252,15 +254,26 @@ function instantiate(questionNum: number, placeHolderInstances: PlaceholderInsta
             } else {
                 instance = selector.instances[selector.index].split('#')[6];
             }
-            questions.push({
-                question: template.instantiate(instance),
-                template: template.template,
-                placeholder: template.placeholder,
-                placeholderInstance: `${selector.instances[selector.index]}`,
-            });
+            const question: string = template.instantiate(instance);
+            if (!(questionsSet.includes(question))) {
+                questions.push({
+                    question: question,
+                    template: template.template,
+                    placeholder: template.placeholder,
+                    placeholderInstance: `${selector.instances[selector.index]}`,
+                });
+                questionsSet.push(question);
+            } else {
+                console.log(`${question} already exists`);
+            }
         }
         templateIndex = (templateIndex + 1) % questionTemplates.length;
         selector.index = (selector.index + 1) % selector.instances.length;
+    }
+
+    if (new Set(questionsSet).size !== questionsSet.length) {
+        console.log('Questions are duplicated!');
+        vscode.window.showErrorMessage('Questions are duplicated!');
     }
 
     return questions;
@@ -310,12 +323,17 @@ export async function labelRelevantContext(questions: string[]): Promise<void> {
 
     const agent: ContextAgent = new ContextAgent();
 
-    const files = await fg.glob('**', {
+    const rawFiles = await fg.glob('**', {
         cwd: workspacePath,
         absolute: true,
         onlyFiles: true,
         ignore: excludePattern, // 忽略node_modules
         dot: true // 包含点文件
+    });
+
+    const files = rawFiles.filter(rawFile => {
+        const ext = path.extname(rawFile).toLowerCase(); // 获取小写的扩展名更稳妥
+        return !unreadableFileTypes.includes(ext);
     });
 
     postMessage( {
@@ -809,6 +827,37 @@ export function autoIncreaseIndex() {
     postMessage({
         command: 'auto',
     });
+}
+
+export async function fetchAllFileTypes() {
+
+    while (checkWorkspaceFolder()) {
+        const types: Set<String> = new Set<String>();
+
+        const files = await fg.glob('**', {
+            cwd: workspacePath,
+            absolute: true,
+            onlyFiles: true,
+            ignore: excludePattern, // 忽略node_modules
+            dot: true // 包含点文件
+        });
+
+        for (const file of files) {
+            types.add(path.extname(file));
+        }
+
+        console.log([...types].sort().join('\n'));
+
+        await vscode.workspace.fs.writeFile(
+            vscode.Uri.file(path.join(workspacePath, '.workspace_benchmark', 'all_file_types.txt')),
+            Buffer.from([...types].sort().join('\n')),
+        );
+
+        workspaceFolderIndex++;
+    }
+
+    workspaceFolderIndex = 0;
+    
 }
 
 export async function constructBenchmark() {
