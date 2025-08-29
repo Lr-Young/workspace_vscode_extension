@@ -190,7 +190,11 @@ export class ContextAgent {
             reason: '',
         };
 
-        const content: string = readFileSync(absoluteFilePath, 'utf8');
+        let content: string = readFileSync(absoluteFilePath, 'utf8');
+
+        if (content.split('\n').length > 3000) {
+            content = content.split('\n').slice(0, 3000).join('\n') + '\nThis file is too long, so the rest of lines are ignored...';
+        }
 
         const relativePathWithRepoName: string = path.join(repoName, path.relative(workspacePath, absoluteFilePath));
 
