@@ -242,7 +242,8 @@ export const unreadableFileTypes: string[] = [
 	'.ulg',
 	'.pdf',
 	'.jpeg',
-	'.jpg'
+	'.jpg',
+	''
 ];
 
 export function getFileLanguage(filePath: string): string {
