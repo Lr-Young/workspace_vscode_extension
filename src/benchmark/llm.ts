@@ -12,6 +12,7 @@ import { OpenAI } from "openai";
 
 import { readFileSync } from 'fs';
 import * as path from 'path';
+import * as fs from 'fs';
 
 import { CodeEntity, FileChunk, mergeFileChunks, getFileLanguage, Graph, QuestionContext } from './typeDefinitions';
 import { postMessage } from './benchmarkWebviewPanel';
@@ -377,7 +378,13 @@ export class AnswerAgent {
         references = mergeFileChunks(references);
 
         for (const reference of references) {
-            const content: string = readFileSync(path.join(workspacePath, reference.relativePath), 'utf8');
+            
+            let file_path = path.join(workspacePath, reference.relativePath);
+            if (!fs.existsSync(file_path)) {
+                file_path = path.join(workspacePath, repoName, reference.relativePath);
+            }
+            
+            const content: string = readFileSync(file_path, 'utf8');
             if (!(reference.relativePath in promptReferences)) {
                 promptReferences[reference.relativePath] = {
                     content: addLineNumber(content.split('\n').slice(reference.startLine - 1, reference.endLine).join('\n'), reference.startLine - 1) + '\n...\n',

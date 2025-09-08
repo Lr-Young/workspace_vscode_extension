@@ -224,3 +224,26 @@ body {
     gap: 10px;
     margin-bottom: 20px;
 }
+
+#button-load-file,
+#button-save-file,
+#button-save-default-file,
+#button-modify-references {
+  background-color: forestgreen;
+  transition: background-color 0.1s ease; /* 平滑过渡效果 */
+}
+
+#button-load-file:active,
+#button-save-file:active,
+#button-save-default-file:active,
+#button-modify-references:active {
+  background-color: darkolivegreen;
+  transform: translateY(1px); /* 添加轻微下压效果 */
+}
+
+#button-load-file:hover,
+#button-save-file:hover,
+#button-save-default-file:hover,
+#button-modify-references:hover {
+  background-color: darkgreen;
+}
