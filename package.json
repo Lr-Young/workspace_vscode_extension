@@ -76,6 +76,7 @@
     "@langchain/community": "^0.3.47",
     "@langchain/core": "^0.3.61",
     "@langchain/deepseek": "^0.0.2",
+    "@langchain/langgraph": "^0.4.9",
     "@types/vscode-webview": "^1.57.5",
     "@types/xlsx": "^0.0.35",
     "@vscode/webview-ui-toolkit": "^1.2.2",

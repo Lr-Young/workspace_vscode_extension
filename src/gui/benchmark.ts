@@ -90,6 +90,8 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
 
         <vscode-button appearance="primary" id="button-fetch-file-types">Fetch All File Types</vscode-button>
 
+        <vscode-button appearance="primary" id="button-load-ref-content">Load Ref Content</vscode-button>
+
         <br></br>
 
         <div class="time-picker">

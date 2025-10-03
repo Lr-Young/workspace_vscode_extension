@@ -1,12 +1,5 @@
 import { escapePathForJsonKey } from './typeDefinitions';
-
-export function addLineNumber(content: string, startLine: number=0): string {
-	const lines = content.split('\n');
-	const numberedLines = lines.map((line, index) => {
-		return `${startLine + index + 1}: ${line}`;
-	});
-	return numberedLines.join('\n');
-}
+import { addLineNumber } from '../utils';
 
 export function getExtractRelevantFileSnippetPrompt(
 	question: string,

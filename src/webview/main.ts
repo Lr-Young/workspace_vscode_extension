@@ -867,6 +867,13 @@ function init() {
 		});
 	};
 
+	
+	(document.getElementById('button-load-ref-content') as Button).onclick = (event) => {
+		vscode.postMessage({
+			command: "load ref content",
+		});
+	};
+
 	window.addEventListener('message', async event => {
 		const message = event.data;
 		switch (message.command) {
@@ -978,7 +985,7 @@ function init() {
 								'Reason': '',
 							};
 						}));
-						await fillGrid('answer-point-grid', message.questions.map(question => {
+						await fillGrid('answer-point-grid', message.questions.map((question: string) => {
 							return {
 								'Question': question,
 								'Reference': '',

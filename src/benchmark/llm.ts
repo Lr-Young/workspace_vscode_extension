@@ -15,11 +15,12 @@ import * as path from 'path';
 
 import { CodeEntity, FileChunk, mergeFileChunks, getFileLanguage, Graph, QuestionContext } from './typeDefinitions';
 import { postMessage } from './benchmarkWebviewPanel';
-import { addLineNumber, getGenerateAnswerPrompt, getExtractRelevantFileSnippetPrompt, getGeneratePointsPrompt } from './prompt';
+import { getGenerateAnswerPrompt, getExtractRelevantFileSnippetPrompt, getGeneratePointsPrompt } from './prompt';
 import { logger, workspacePath } from './main';
-import { sleep } from "../utils";
+import { addLineNumber, sleep } from "../utils";
 
 type ParseOutput = {success: boolean, ranges: {filename: string, start: number, end: number}[], reason: string};
+
 
 const MOCK_CONTEXT_ANSWER: string = `
 [Analysis]

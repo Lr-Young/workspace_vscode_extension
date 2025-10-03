@@ -213,3 +213,71 @@ export function deepCopyRecordSet(original: Record<string, Set<string>>): Record
     
     return copy;
 }
+
+/**
+ * 从一个字符串中解析出所有有效的JSON格式对象。
+ * @param inputString 需要解析的原始字符串。
+ * @returns 一个包含所有解析出的JSON对象的数组。如果未找到任何有效对象，则返回空数组。
+ */
+export function extractAllJSONObjects(inputString: string): any[] {
+    const jsonObjects: any[] = [];
+    const len = inputString.length;
+    let startIndex = 0;
+    let stack = 0; // 栈，用于匹配花括号
+    let inString = false; // 标记是否在字符串字面量内
+    let escapeNext = false; // 标记下一个字符是否被转义
+    let objectStartIndex = -1;
+
+    for (let i = 0; i < len; i++) {
+        const char = inputString[i];
+
+        // 处理转义字符
+        if (escapeNext) {
+            escapeNext = false;
+            continue;
+        }
+
+        if (char === '\\') {
+            escapeNext = true;
+            continue;
+        }
+
+        // 处理字符串的开始和结束（忽略字符串内的花括号）
+        if (char === '"' && !escapeNext) {
+            inString = !inString;
+        }
+
+        // 如果不在字符串内，则检查花括号
+        if (!inString) {
+            if (char === '{') {
+                if (stack === 0) {
+                    objectStartIndex = i; // 记录对象开始位置
+                }
+                stack++;
+            } else if (char === '}') {
+                stack--;
+                // 当栈为0时，说明找到了一个完整的对象
+                if (stack === 0 && objectStartIndex !== -1) {
+                    const potentialJsonString = inputString.substring(objectStartIndex, i + 1);
+                    try {
+                        const parsedObject = JSON.parse(potentialJsonString);
+                        jsonObjects.push(parsedObject);
+                    } catch (e) {
+                        // 解析失败，说明这不是一个有效的JSON，静默跳过
+                    }
+                    objectStartIndex = -1; // 重置开始位置
+                }
+            }
+        }
+    }
+
+    return jsonObjects;
+}
+
+export function addLineNumber(content: string, startLine: number=0): string {
+	const lines = content.split('\n');
+	const numberedLines = lines.map((line, index) => {
+		return `${startLine + index + 1}: ${line}`;
+	});
+	return numberedLines.join('\n');
+}

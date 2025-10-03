@@ -860,6 +860,74 @@ export async function fetchAllFileTypes() {
     
 }
 
+function readFileLines(
+    folderName: string, 
+    filePath: string, 
+    startLine: number, 
+    endLine: number
+): string {
+    // 获取工作区文件夹
+    const workspaceFolder = vscode.workspace.workspaceFolders?.find(
+        folder => folder.name === folderName
+    );
+
+    if (!workspaceFolder) {
+        throw new Error(`Workspace folder "${folderName}" not found`);
+    }
+
+    // 构建完整文件路径
+    const fullPath = vscode.Uri.joinPath(workspaceFolder.uri, filePath);
+    
+    // 读取文件内容
+    const fileContent = fs.readFileSync(fullPath.fsPath, 'utf-8');
+    
+    // 分割行并提取范围
+    const lines = fileContent.split(/\r?\n/);
+    const start = Math.max(0, startLine - 1); // 转换为0-based索引
+    const end = Math.min(lines.length, endLine); // 不包含结束行
+    
+    if (start >= end) {
+        throw new Error(`Invalid line range: ${startLine}-${endLine}`);
+    }
+
+    return lines.slice(start, end).join('\n');
+}
+
+export async function loadRefContent() {
+    const path: string = 'C:\\Users\\lry72\\code\\python\\out.json';
+
+    const data = JSON.parse(fs.readFileSync(path, 'utf-8'));
+
+    Object.entries(data).forEach(([key, value]) => {
+        (value as Record<string, any>[]).forEach(e => {
+            if (e['References'].length === 0) {
+                e['Reference Content'] = 'No Relevant Context Snippets Retrieved';
+            } else {
+                e['Reference Content'] = '';
+                for (let i = 0; i < e['References'].length; i++) {
+                    const ref = e['References'][i];
+                    const splits = ref.split(':');
+                    const filePath = splits[0];
+                    const startLine = parseInt(splits[1].split('-')[0]);
+                    const endLine = parseInt(splits[1].split('-')[1]);
+                    if (startLine > endLine) {
+                        e['References'][i] = `${filePath}:${endLine}-${startLine}`;
+                        e['Reference Content'] += `<code snippets position>${ref}<code snippets position/>\n<code>\n${readFileLines(key, filePath, endLine, startLine)}\n<code/>\n\n`;
+                    }else {
+                        e['Reference Content'] += `<code snippets position>${ref}<code snippets position/>\n<code>\n${readFileLines(key, filePath, startLine, endLine)}\n<code/>\n\n`;
+                    }
+                }
+            }
+            if (e['Question'] === "What is the role of class AggregateExec?") {
+                console.log(e['Reference Content']);
+            }
+        });
+    });
+    
+    fs.writeFileSync(path, JSON.stringify(data, null, 4), 'utf-8');
+    console.log('load ref content done');
+}
+
 export async function constructBenchmark() {
 
     // if (vscode.workspace.workspaceFolders === undefined || vscode.workspace.workspaceFolders.length !== 1) {
