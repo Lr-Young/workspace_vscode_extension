@@ -79,6 +79,16 @@ const webviewConfig = {
 	],
 };
 
+// Config for workspace agent webview source code (to be run in a web-based context)
+/** @type BuildOptions */
+const workspaceAgentWebviewConfig = {
+	...baseConfig,
+	target: "es2020",
+	format: "esm",
+	entryPoints: ["./src/webview/workspaceAgentScript.ts"],
+	outfile: "./out/workspaceAgentScript.js",
+};
+
 // This watch config adheres to the conventions of the esbuild-problem-matchers
 // extension (https://github.com/connor4312/esbuild-problem-matchers#esbuild-via-js)
 /** @type BuildOptions */
@@ -115,12 +125,17 @@ const watchConfig = {
 				...webviewConfig,
 				...watchConfig,
 			});
+			await build({
+				...workspaceAgentWebviewConfig,
+				...watchConfig,
+			});
 			timedLog("Build --watch finished. Waiting for changes...");
 		} else {
 			timedLog("Build started. Watching for changes...");
 			// Build extension and webview code
 			await build(extensionConfig);
 			await build(webviewConfig);
+			await build(workspaceAgentWebviewConfig);
 			timedLog("Build completed");
 		}
 	} catch (err) {

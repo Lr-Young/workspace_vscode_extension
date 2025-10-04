@@ -6,7 +6,6 @@ import {
 	Button,
 } from "@vscode/webview-ui-toolkit";
 
-import { dataLoaders } from "../gui/components";
 import { FileChunk, mergeFileChunks, Placeholder, PlaceholderInstance, QuestionInstance } from "../benchmark/typeDefinitions";
 import { executeInTimeRange, sleep } from '../utils';
 import { commands } from "vscode";
@@ -557,17 +556,6 @@ async function jsonToGridData(data: Record<string, Record<string, string[]>>, wo
 			continue;
 		}
 		fillGrid(id, data[id], true);
-	}
-}
-
-function loadData(): void {
-	for (const [id, dataLoader] of Object.entries(dataLoaders)) {
-		const element = document.getElementById(id);
-		if (element) {
-			dataLoader(id);
-		} else {
-			console.warn(`No element found with id: ${id}`);
-		}
 	}
 }
 

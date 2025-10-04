@@ -2,10 +2,13 @@ import { system_prompt } from './prompts';
 
 import { BaseMessage, AIMessage, SystemMessage, HumanMessage, MessageContent, MessageContentText } from '@langchain/core/messages';
 import { Annotation, StateGraph, START, END, Command } from '@langchain/langgraph';
-
 import { ChatDeepSeek } from '@langchain/deepseek';
 
 import { addLineNumber, extractAllJSONObjects } from '../utils';
+
+import { CustomCallbackHandler } from './callbacks';
+
+import { postMessage } from './workspaceAgentWebviewProvider';
 
 import * as path from 'path';
 import * as fs from 'fs';
@@ -13,7 +16,13 @@ import * as fs from 'fs';
 const model = new ChatDeepSeek({
 	model: 'deepseek-chat',
 	temperature: 0,
+	streaming: true,
+	callbacks: [new CustomCallbackHandler()],
 });
+
+export async function testModel(query: string): Promise<void> {
+	await model.invoke(query);
+}
 
 function parseMessageContent(response: MessageContent): string {
 	if (typeof response === 'string') {
@@ -332,14 +341,23 @@ const callModel = async (state: typeof StateAnnotation.State) => {
 	if (jsonObject.length === 1) {
 		const params = jsonObject[0];
 		if (isGrepConfig(params) || isReadFileConfig(params)) {
+			postMessage({
+				command: 'Agent',
+				type: 'think done',
+			});
 			return new Command({
 				update: {
 					toolCallParams: params
 				},
-				goto: 'toolCall',
+				goto: 'callTool',
 			});
 		}
 	}
+
+	postMessage({
+		command: 'Agent',
+		type: 'done',
+	});
 
 	return new Command({
 		update: {
@@ -349,7 +367,7 @@ const callModel = async (state: typeof StateAnnotation.State) => {
 	});
 };
 
-const toolCall = async (state: typeof StateAnnotation.State) => {
+const callTool = async (state: typeof StateAnnotation.State) => {
 	const params = state.toolCallParams;
 	if (isGrepConfig(params)) {
 		const result = await grep(params);
@@ -360,6 +378,14 @@ const toolCall = async (state: typeof StateAnnotation.State) => {
 		const result = await readFileRelevantParts(params, state.question, state.messages);
 		return {
 			messages: [new HumanMessage(result)],
-		}
+		};
 	}
 };
+
+export const agent = new StateGraph(StateAnnotation)
+	.addNode('callModel', callModel, {
+		ends: ['callTool', END],
+	})
+	.addNode('callTool', callTool)
+	.addEdge(START, 'callModel')
+	.compile();

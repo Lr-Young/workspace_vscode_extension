@@ -30,19 +30,19 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "chat-assistant-sidebar",
-          "title": "Chat Assistant",
-          "icon": "media/icon.svg"
+          "id": "workspace-agent-sidebar",
+          "title": "Workspace Agent",
+          "icon": "media/robot.svg"
         }
       ]
     },
     "views": {
-      "chat-assistant-sidebar": [
+      "workspace-agent-sidebar": [
         {
           "type": "webview",
-          "id": "chat-assistant-view",
-          "name": "LLM Chat",
-          "icon": "media/icon.svg"
+          "id": "workspace-agent-view",
+          "name": "Workspace Agent",
+          "icon": "media/robot.svg"
         }
       ]
     }
@@ -80,8 +80,10 @@
     "@types/vscode-webview": "^1.57.5",
     "@types/xlsx": "^0.0.35",
     "@vscode/webview-ui-toolkit": "^1.2.2",
+    "dompurify": "^3.2.7",
     "fast-glob": "^3.3.3",
     "langchain": "^0.3.29",
+    "marked": "^16.3.0",
     "reflect-metadata": "^0.2.2",
     "tree-sitter": "^0.22.4",
     "tree-sitter-python": "^0.23.6",

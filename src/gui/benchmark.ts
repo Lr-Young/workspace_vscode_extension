@@ -1,20 +1,5 @@
 import { Webview, Uri } from "vscode";
 import { getNonce } from "../utils";
-import { badgeDemo } from "./demos/badge";
-import { buttonDemo } from "./demos/button";
-import { checkboxDemo } from "./demos/checkbox";
-import { dataGridDemo } from "./demos/data-grid";
-import { dividerDemo } from "./demos/divider";
-import { dropdownDemo } from "./demos/dropdown";
-import { linkDemo } from "./demos/link";
-import { panelsDemo } from "./demos/panels";
-import { progressRingDemo } from "./demos/progress-ring";
-import { radioGroupDemo } from "./demos/radio-group";
-import { tagDemo } from "./demos/tag";
-import { textAreaDemo } from "./demos/text-area";
-import { textFieldDemo } from "./demos/text-field";
-
-import { htmlComponents } from "./components";
 
 function getUri(webview: Webview, extensionUri: Uri, ...pathList: string[]) {
   return webview.asWebviewUri(Uri.joinPath(extensionUri, ...pathList));
@@ -204,67 +189,3 @@ export function getWebviewContent(webview: Webview, extensionUri: Uri) {
 
 	`.trim();
 }
-
-/*
-
-<div id="test"></div>
-    <vscode-button appearance="primary" id="test-constructing">Test Button</vscode-button>
-	<vscode-divider role="separator"></vscode-divider>
-
-<div class="hidden" id="placeholder-section">
-		<section class="grid-one-column">
-			<section class="component-container">
-                <vscode-checkbox readonly id="question-instantiation-checkbox">Question Instantiation</vscode-checkbox>
-                <vscode-progress-ring class="hidden" id="question-instantiation-progress-ring"></vscode-progress-ring>
-
-                <vscode-checkbox readonly id="label-reference-checkbox">Label Relevant Context References</vscode-checkbox>
-                <vscode-progress-ring class="hidden" id="label-reference-progress-ring"></vscode-progress-ring>
-
-                <vscode-data-grid class="hidden" id="question-references-grid" grid-template-columns="1fr 1fr 2fr"></vscode-data-grid>
-
-			</section>
-		</section>
-		<vscode-divider role="separator"></vscode-divider>
-	</div>
-
-    <section class="grid-one-column">
-        ${htmlComponents.datasetStatistics}
-    </section>
-    <vscode-divider role="separator"></vscode-divider>
-
-    <section class="grid-two-column">
-        ${htmlComponents.datasetQuestionType}
-        ${htmlComponents.datasetQuestionType}
-    </section>
-    <vscode-divider role="separator"></vscode-divider>
-
-    <section class="component-row">
-        ${badgeDemo}
-        ${buttonDemo}
-        ${checkboxDemo}
-    </section>
-    <section id="data-grid-row">
-        ${dataGridDemo}
-    </section>
-    <section class="component-row">
-        ${dividerDemo}
-        ${dropdownDemo}
-        ${linkDemo}
-    </section>
-    <section id="panels-row">
-        ${panelsDemo}
-    </section>
-    <section class="component-row">
-        ${progressRingDemo}
-        ${radioGroupDemo}
-        ${tagDemo}
-    </section>
-    <section class="component-row">
-        ${textAreaDemo}
-        ${textFieldDemo}
-    </section>
-    <script type="module" nonce="${nonce}" src="${webviewUri}"></script>
-</body>
-
-</html>
-*/

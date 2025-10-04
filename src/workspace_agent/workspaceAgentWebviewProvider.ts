@@ -1,0 +1,42 @@
+import * as vscode from 'vscode';
+import { getWorkspaceAgentHtml } from '../gui/workspaceAgentHtml';
+
+import { testModel } from './stateGraph';
+
+let webview: vscode.Webview;
+
+export function postMessage(message: any) {
+    webview.postMessage(message);
+}
+
+export class WorkspaceAgentWebviewProvider implements vscode.WebviewViewProvider {
+
+    constructor(private readonly context: vscode.ExtensionContext) { }
+
+    resolveWebviewView(webviewView: vscode.WebviewView): void {
+
+        webview = webviewView.webview;
+
+        webviewView.webview.html = getWorkspaceAgentHtml(webviewView.webview, this.context.extensionUri);
+
+        webviewView.webview.options = {
+            enableScripts: true,
+        };
+
+        // 接收来自 Webview 的消息
+        webviewView.webview.onDidReceiveMessage(async message => {
+            switch (message.command) {
+                case 'query': {
+                    testModel(message.query);
+                    break;
+                }
+                case 'warn': {
+                    console.log(`warn: ${message.content}`);
+                    vscode.window.showWarningMessage(message.content);
+                    break;
+                }
+            }
+        });
+    }
+
+}
