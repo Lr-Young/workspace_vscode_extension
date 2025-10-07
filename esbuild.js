@@ -55,7 +55,18 @@ const extensionConfig = {
 	format: "cjs",
 	entryPoints: ["./src/extension.ts"],
 	outfile: "./out/extension.js",
-	external: ["vscode", "node-gyp-build", "tree-sitter", "tree-sitter-python"],
+	external: ["vscode", "node-gyp-build", "tree-sitter", "tree-sitter-python", "onnxruntime-node"],
+	plugins: [
+		// Copy webview css and ttf files to `out` directory unaltered
+		copy({
+			resolveFrom: "cwd",
+			assets: {
+				from: ["./src/workspace_agent/*.json"],
+				to: ["./out"],
+			},
+			watch: true,
+		}),
+	],
 };
 
 // Config for webview source code (to be run in a web-based context)

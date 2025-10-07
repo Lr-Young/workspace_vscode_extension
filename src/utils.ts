@@ -214,70 +214,119 @@ export function deepCopyRecordSet(original: Record<string, Set<string>>): Record
     return copy;
 }
 
-/**
- * 从一个字符串中解析出所有有效的JSON格式对象。
- * @param inputString 需要解析的原始字符串。
- * @returns 一个包含所有解析出的JSON对象的数组。如果未找到任何有效对象，则返回空数组。
- */
-export function extractAllJSONObjects(inputString: string): any[] {
-    const jsonObjects: any[] = [];
-    const len = inputString.length;
-    let startIndex = 0;
-    let stack = 0; // 栈，用于匹配花括号
-    let inString = false; // 标记是否在字符串字面量内
-    let escapeNext = false; // 标记下一个字符是否被转义
-    let objectStartIndex = -1;
-
-    for (let i = 0; i < len; i++) {
-        const char = inputString[i];
-
-        // 处理转义字符
-        if (escapeNext) {
-            escapeNext = false;
-            continue;
-        }
-
-        if (char === '\\') {
-            escapeNext = true;
-            continue;
-        }
-
-        // 处理字符串的开始和结束（忽略字符串内的花括号）
-        if (char === '"' && !escapeNext) {
-            inString = !inString;
-        }
-
-        // 如果不在字符串内，则检查花括号
-        if (!inString) {
-            if (char === '{') {
-                if (stack === 0) {
-                    objectStartIndex = i; // 记录对象开始位置
-                }
-                stack++;
-            } else if (char === '}') {
-                stack--;
-                // 当栈为0时，说明找到了一个完整的对象
-                if (stack === 0 && objectStartIndex !== -1) {
-                    const potentialJsonString = inputString.substring(objectStartIndex, i + 1);
-                    try {
-                        const parsedObject = JSON.parse(potentialJsonString);
-                        jsonObjects.push(parsedObject);
-                    } catch (e) {
-                        // 解析失败，说明这不是一个有效的JSON，静默跳过
-                    }
-                    objectStartIndex = -1; // 重置开始位置
-                }
-            }
-        }
-    }
-
-    return jsonObjects;
-}
-
 export function addLineNumber(content: string, startLine: number=0): string {
 	const lines = content.split('\n');
 	const numberedLines = lines.map((line, index) => {
 		return `${startLine + index + 1}: ${line}`;
 	});
 	return numberedLines.join('\n');
+}
+
+export function getOrderWord(id: number) {
+    const orders: string[] = [
+        "1st",
+        "2nd",
+        "3rd",
+        "4th",
+        "5th",
+        "6th",
+        "7th",
+        "8th",
+        "9th",
+        "10th",
+        "11th",
+        "12th",
+        "13th",
+        "14th",
+        "15th",
+        "16th",
+        "17th",
+        "18th",
+        "19th",
+        "20th",
+        "21st",
+        "22nd",
+        "23rd",
+        "24th",
+        "25th",
+        "26th",
+        "27th",
+        "28th",
+        "29th",
+        "30th",
+        "31st",
+        "32nd",
+        "33rd",
+        "34th",
+        "35th",
+        "36th",
+        "37th",
+        "38th",
+        "39th",
+        "40th",
+        "41st",
+        "42nd",
+        "43rd",
+        "44th",
+        "45th",
+        "46th",
+        "47th",
+        "48th",
+        "49th",
+        "50th",
+        "51st",
+        "52nd",
+        "53rd",
+        "54th",
+        "55th",
+        "56th",
+        "57th",
+        "58th",
+        "59th",
+        "60th",
+        "61st",
+        "62nd",
+        "63rd",
+        "64th",
+        "65th",
+        "66th",
+        "67th",
+        "68th",
+        "69th",
+        "70th",
+        "71st",
+        "72nd",
+        "73rd",
+        "74th",
+        "75th",
+        "76th",
+        "77th",
+        "78th",
+        "79th",
+        "80th",
+        "81st",
+        "82nd",
+        "83rd",
+        "84th",
+        "85th",
+        "86th",
+        "87th",
+        "88th",
+        "89th",
+        "90th",
+        "91st",
+        "92nd",
+        "93rd",
+        "94th",
+        "95th",
+        "96th",
+        "97th",
+        "98th",
+        "99th",
+        "100th",
+    ];
+
+    console.log(`in get order word ${id}: ${orders[id - 1]}`);
+
+    return orders[id - 1];
 }

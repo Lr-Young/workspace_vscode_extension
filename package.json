@@ -73,6 +73,7 @@
     "typescript": "^5.7.3"
   },
   "dependencies": {
+    "@huggingface/transformers": "^3.7.5",
     "@langchain/community": "^0.3.47",
     "@langchain/core": "^0.3.61",
     "@langchain/deepseek": "^0.0.2",

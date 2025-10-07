@@ -183,39 +183,110 @@ main#chat-container::-webkit-scrollbar-thumb:hover {
   color: #c586c0; /* 紫色关键字 */
 }
 
-.bubble ul,
-.bubble ol {
-  margin: 0;               /* 移除外边距，防止列表整体下移 */
-  padding-left: 1.5em;     /* 控制缩进深度（推荐 1.5em ~ 2em） */
-  list-style-position: inside; /* 让序号或圆点在内容框内绘制 */
+/* AI group: 一个头像 + 右侧容器包含多个 bubble */
+.message.ai-group {
+  display:flex; 
+  align-self:flex-start; 
+  gap:12px; 
+  max-width:80%;
+}
+.message.ai-group .avatar {
+  width:40px; 
+  height:40px; 
+  border-radius:50%;
+  background:#007acc; 
+  color:#fff;
+  display:flex; 
+  align-items:center; 
+  justify-content:center; 
+  flex-shrink:0;
 }
 
-/* 思考阶段气泡 */
-.message.thinking .bubble {
-  background: #4b3069; /* 紫色，突出“思考” */
-  color: #e0d7f8;
+/* AI 内容列（包含多条 bubble） */
+.ai-content {
+  display:flex; 
+  flex-direction:column; 
+  gap:10px; 
+  flex:1;
 }
 
-/* 工具调用气泡（内容隐藏） */
-.message.tool .bubble {
-  background: #003b5c; /* 深蓝色 */
-  color: #a9d5f2;
-  font-style: italic;
+/* 通用 bubble（ai 内容） */
+.ai-content .bubble {
+  padding:12px 16px; 
+  border-radius:12px; 
+  font-size:0.9rem; 
+  line-height:1.5;
+  white-space:pre-wrap; 
+  word-break:break-word;
 }
 
-/* 折叠状态样式 */
-.collapsed {
-  max-height: 1em;
-  overflow: hidden;
+/* 三种类型背景色（符合 VSCode 主题） */
+.ai-content .bubble.thinking {
+  background:#4b3069; 
+  color:#e0d7f8; /* 紫色思考 */
+  font-style:italic;
+}
+.ai-content .bubble.tool {
+  background:#003b5c; 
+  color:#a9d5f2; /* 深蓝工具 */
+  font-style:italic;
+}
+.ai-content .bubble.answer {
+  background:#2d2d2d; 
+  color:#d4d4d4; /* 最终答案 */
+}
+
+/* 可折叠样式：光标为选择，悬浮后展示“点击折叠”提示 */
+.ai-content .bubble.collapsable {
   cursor: pointer;
-  opacity: 0.8;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
-/* 鼠标悬浮提示 */
-.collapsed::after {
-  content: " ⬇ 点击展开";
-  font-size: 0.8rem;
-  color: #888;
+/* 默认隐藏提示词 */
+.ai-content .bubble.collapsable::after {
+  content: "点击折叠";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+  transition-delay: 1s; /* 鼠标悬停1秒后才出现 */
 }
+
+.ai-content .bubble.collapsable:hover {
+  cursor: pointer;
+}
+
+.ai-content .bubble.collapsable:hover::after {
+  opacity: 1;
+}
+
+/* 折叠通用样式：只占一行高度，文本溢出显示省略号 */
+.ai-content .bubble.collapsed {
+  height: 40px; 
+  overflow:hidden; 
+  white-space:nowrap; 
+  text-overflow:ellipsis;
+  cursor:pointer; 
+  opacity:0.75;
+}
+
+/* 可选：折叠态右侧提示 */
+.ai-content .bubble.collapsed::after {
+  content: "  ⬇ 点击展开"; 
+  font-size:0.8rem; 
+  color:#9aa3b2; 
+  margin-left:6px;
+}
+
+/* 列表在 bubble 内对齐（防止列表序号溢出） */
+.ai-content .bubble ol,
+.ai-content .bubble ul {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+  list-style-position: inside;
+  line-height: 1em;
+}
+
+.ai-content .bubble li { margin:0.2em 0; line-height:1.4; }

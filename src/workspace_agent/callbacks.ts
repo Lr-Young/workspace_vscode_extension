@@ -48,7 +48,7 @@ export class CustomCallbackHandler extends BaseCallbackHandler {
         postMessage({
             command: 'LLM',
             type: 'error',
-            content: 'TEST: LLM Error',
+            content: `\nLLM Error: \n${err}`,
         });
     }
     /**

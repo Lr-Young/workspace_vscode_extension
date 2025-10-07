@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { getWorkspaceAgentHtml } from '../gui/workspaceAgentHtml';
 
-import { testModel } from './stateGraph';
+import { invoke } from './stateGraph';
 
 let webview: vscode.Webview;
 
@@ -27,7 +27,8 @@ export class WorkspaceAgentWebviewProvider implements vscode.WebviewViewProvider
         webviewView.webview.onDidReceiveMessage(async message => {
             switch (message.command) {
                 case 'query': {
-                    testModel(message.query);
+                    // testModel(message.query);
+                    invoke(message.query);
                     break;
                 }
                 case 'warn': {
