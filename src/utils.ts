@@ -330,3 +330,7 @@ export function getOrderWord(id: number) {
 
     return orders[id - 1];
 }
+
+export function toUnixPath(filePath: string): string {
+    return filePath.replace(/\\/g, '/');
+}

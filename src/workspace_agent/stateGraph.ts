@@ -1,28 +1,26 @@
+import * as fs from 'fs';
+import * as path from 'path';
+
 import { systemPrompt, stopPrompt } from './prompts';
 
-import { BaseMessage, AIMessage, SystemMessage, HumanMessage, MessageContent, MessageContentText } from '@langchain/core/messages';
+import { BaseMessage, AIMessage, SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { Annotation, StateGraph, START, END, Command } from '@langchain/langgraph';
 
 import { postMessage } from './workspaceAgentWebviewProvider';
 
 import { getTokenCount } from './tokenizer';
 
-import { model, maxModelTokens } from './models';
+import { agentModel, maxModelTokens, parseMessageContent, evaluationModel } from './models';
 
-import { grep, read, isGrepConfig, GrepArgs, ReadFileArgs, parseToolCall, isReadFileConfig } from './tools';
+import { grep, read, isGrepConfig, GrepArgs, ReadFileArgs, parseToolCall, isReadFileConfig, getWorkspacePath, getWorkspaceFolderCount } from './tools';
 
-export function parseMessageContent(response: MessageContent): string {
-	if (typeof response === 'string') {
-		// 如果 content 直接是字符串
-		return response;
-	} else {
-		// 如果 content 是 MessageContentComplex[] 数组，提取所有 'text' 类型的内容并拼接
-		return response
-			.filter(block => block.type === 'text' && 'text' in block)
-			.map(block => (block as MessageContentText).text)
-			.join('');
-	}
-}
+import { generateSummary, summaryFilePath } from './summary';
+
+import { concurrencyRun } from '../utils';
+
+import { evaluation, evaluationData } from './evaluation';
+
+const model = evaluation ? evaluationModel : agentModel;
 
 const StateAnnotation = Annotation.Root({
 	question: Annotation<string>,
@@ -37,6 +35,9 @@ const StateAnnotation = Annotation.Root({
 	}),
 	tokenCounts: Annotation<number[]>({
 		reducer: (left: number[], right: number | number[]) => {
+			if (left.length === 0) {
+				return Array.isArray(right) ? right : [right];
+			}
 			if (Array.isArray(right)) {
 				for (const num of right) {
 					left.push(left[left.length - 1] + num);
@@ -49,11 +50,12 @@ const StateAnnotation = Annotation.Root({
 	}),
 	toolCallParams: Annotation<GrepArgs & {tool: string} | ReadFileArgs & {tool: string}>,
 	maxRetries: Annotation<number>,
+	workspaceIndex: Annotation<number>,
+	questionIndex: Annotation<number>,
 });
 
 const callModel = async (state: typeof StateAnnotation.State) => {
 	const messages: BaseMessage[] = [
-		new SystemMessage(systemPrompt),
 		...state.messages,
 	];
 
@@ -84,11 +86,17 @@ const callModel = async (state: typeof StateAnnotation.State) => {
 
 	let parseOutput = parseToolCall(content);
 
-	if (!parseOutput.thinking && !parseOutput.intention && !parseOutput.json) {
+	if ((!parseOutput.thinking && !parseOutput.intention && !parseOutput.json) || 
+		(!parseOutput.json)) {
 		postMessage({
 			command: 'Agent',
 			type: 'done',
 		});
+
+		if (evaluation) {
+			evaluationData[state.workspaceIndex].data[state.questionIndex]['candidateAnswer'] = content;
+			evaluationData[state.workspaceIndex].data[state.questionIndex]['isSet'] = true;
+		}
 
 		const msg = new AIMessage(content);
 
@@ -145,9 +153,9 @@ const callTool = async (state: typeof StateAnnotation.State) => {
 	const params = state.toolCallParams;
 	let result: string;
 	if (isGrepConfig(params)) {
-		result = await grep(params.args);
+		result = await grep(params.args, state.workspaceIndex, state.questionIndex);
 	} else if (isReadFileConfig(params)) {
-		result = await read(params.args, state.question, state.messages);
+		result = await read(params.args, state.question, state.messages, state.workspaceIndex, state.questionIndex);
 	} else {
 		result = 'tool call json format is wrong!';
 	}
@@ -165,32 +173,64 @@ const callTool = async (state: typeof StateAnnotation.State) => {
 	};
 };
 
-const agent = new StateGraph(StateAnnotation)
-	.addNode('callModel', callModel, {
-		ends: ['callTool', 'callModel', END],
-	})
-	.addNode('callTool', callTool)
-	.addEdge(START, 'callModel')
-	.addEdge('callTool', 'callModel')
-	.compile()
-	.withConfig({
-		recursionLimit: 100
-	});
+const generateRepositorySummary = async (state: typeof StateAnnotation.State) => {
 
-export async function invoke(query: string): Promise<void> {
-	postMessage({
-		command: 'Agent',
-		type: 'start',
-	});
-	const msg = new HumanMessage(query);
-	await agent.invoke({
-		question: query,
+	const filePath = path.join(getWorkspacePath(), summaryFilePath);
+
+	const summary = fs.existsSync(filePath) ? fs.readFileSync(filePath, { encoding: 'utf-8' }) : await generateSummary();
+
+	const msg = new HumanMessage(`
+Below is the hierarchical summary of the repository structure, including each directory' summary and contents and each file's summary and entities defined.
+This summary is **for reference only** — it helps you decide where to retrieve relative information, but cannot be used as factual evidence.
+You must still call tools to retrieve actual repository content, and base your final answer only on verified tool outputs, not on this summary.
+${summary}`.trim());
+	
+	return {
 		messages: [
 			msg,
 		],
 		tokenCounts: [
 			await getTokenCount(msg),
 		],
+	};
+};
+
+const agent = new StateGraph(StateAnnotation)
+	.addNode('callModel', callModel, {
+		ends: ['callTool', 'callModel', END],
+	})
+	.addNode('callTool', callTool)
+	.addNode('generateRepositorySummary', generateRepositorySummary)
+	.addEdge(START, 'generateRepositorySummary')
+	.addEdge('callTool', 'callModel')
+	.addEdge('generateRepositorySummary', 'callModel')
+	.compile()
+	.withConfig({
+		recursionLimit: 200
+	});
+
+export async function invoke(query: string, workspaceIndex: number = 0, questionIndex: number = 0): Promise<void> {
+	postMessage({
+		command: 'Agent',
+		type: 'start',
+	});
+	const sysMsg = new SystemMessage(systemPrompt);
+	const msg = new HumanMessage(query);
+	const tokens1 = await getTokenCount(sysMsg);
+	const tokens2 = await getTokenCount(msg);
+	await agent.invoke({
+		question: query,
+		messages: [
+			sysMsg,
+			msg,
+		],
+		tokenCounts: [
+			tokens1,
+			tokens1 + tokens2,
+		],
 		maxRetries: 5,
+		workspaceIndex: workspaceIndex,
+		questionIndex: questionIndex,
 	});
 }
+

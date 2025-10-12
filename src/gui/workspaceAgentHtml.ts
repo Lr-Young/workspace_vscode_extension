@@ -28,6 +28,7 @@ export function getWorkspaceAgentHtml(webview: Webview, extensionUri: Uri) {
 
     <header>
         <h1>🤖 Workspace Agent </h1>
+        <button id="auto-evaluation-button">🧪 自动评估</button>
     </header>
 
     <main id="chat-container">

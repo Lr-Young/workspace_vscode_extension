@@ -3,9 +3,14 @@ import { getWorkspaceAgentHtml } from '../gui/workspaceAgentHtml';
 
 import { invoke } from './stateGraph';
 
+import { evaluation, evaluate } from './evaluation';
+
 let webview: vscode.Webview;
 
 export function postMessage(message: any) {
+    if (evaluation) {
+        return;
+    }
     webview.postMessage(message);
 }
 
@@ -34,6 +39,13 @@ export class WorkspaceAgentWebviewProvider implements vscode.WebviewViewProvider
                 case 'warn': {
                     console.log(`warn: ${message.content}`);
                     vscode.window.showWarningMessage(message.content);
+                    break;
+                }
+                case 'evaluation': {
+                    await evaluate();
+                    postMessage({
+                        command: 'evaluation done',
+                    });
                     break;
                 }
             }

@@ -290,3 +290,35 @@ main#chat-container::-webkit-scrollbar-thumb:hover {
 }
 
 .ai-content .bubble li { margin:0.2em 0; line-height:1.4; }
+
+/* 🔹 顶部“自动测试”按钮样式 */
+#auto-evaluation-button {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #0e639c;         /* VSCode 深蓝主色 */
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+#auto-evaluation-button:hover {
+  background: #1177bb;         /* hover 更亮的蓝色 */
+}
+
+#auto-evaluation-button:active {
+  background: #005a9e;         /* 点击态更深蓝 */
+}
+
+#auto-evaluation-button:disabled {
+  background: #3c3c3c;         /* 禁用灰色 */
+  color: #888888;
+  cursor: not-allowed;
+  opacity: 0.6;
+}

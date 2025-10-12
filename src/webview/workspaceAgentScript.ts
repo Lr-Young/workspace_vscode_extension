@@ -23,6 +23,7 @@ let aiGroupCount: number = -1;
 const chatContainer = (document.getElementById('chat-container'));
 const input = document.getElementById("user-input") as HTMLInputElement;
 const sendButton = document.getElementById("send-button") as HTMLButtonElement;
+const evaluateButton = document.getElementById('auto-evaluation-button') as HTMLButtonElement;
 
 function currentBubbleId(): string {
     return `bubble-id-${aiGroupCount}-${bubbleCount}`;
@@ -132,9 +133,20 @@ function sendMessage() {
 
 }
 
+function evaluationMessage() {
+    console.log('evaluationMessage clicked');
+    vscode.postMessage({
+        command: 'evaluation',
+    });
+
+    evaluateButton.disabled = true;
+}
+
 function init() {
 
     sendButton.onclick = sendMessage;
+
+    evaluateButton.onclick = evaluationMessage;
 
     input.addEventListener('keypress', (event) => {
         if (event.key === 'Enter') {
@@ -195,6 +207,10 @@ function init() {
                         break;
                     }
                 }
+                break;
+            }
+            case 'evaluation done': {
+                evaluateButton.disabled = false;
                 break;
             }
         }

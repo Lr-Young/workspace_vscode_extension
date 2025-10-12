@@ -1,19 +1,28 @@
 import * as vscode from 'vscode';
 
-import { addLineNumber } from '../utils';
+import { addLineNumber, toUnixPath } from '../utils';
 
 import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 
 import { getMessagesTokenCount } from './tokenizer';
 
-import { maxModelTokens, readFileModel } from './models';
+import { maxModelTokens, readFileModel, parseMessageContent } from './models';
+
+import { evaluation, evaluationData } from './evaluation';
+
+import { unreadableFileTypes } from '../benchmark/typeDefinitions';
 
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { parseMessageContent } from './stateGraph';
+export function getWorkspaceFolderCount(): number {
+    if (vscode.workspace.workspaceFolders === undefined) {
+        return 0;
+    }
+    return vscode.workspace.workspaceFolders.length;
+}
 
-function getWorkspacePath(index: number=0): string {
+export function getWorkspacePath(index: number=0): string {
     if (vscode.workspace.workspaceFolders === undefined) {
         vscode.window.showErrorMessage(`No Workspace Folder Opened`);
         return '';
@@ -27,8 +36,8 @@ function getWorkspacePath(index: number=0): string {
     return `${vscode.workspace.workspaceFolders[index].uri.fsPath}${path.sep}`;
 }
 
-function combineAbsolutePath(relativePath: string): string {
-    let workspacePath = getWorkspacePath();
+function combineAbsolutePath(relativePath: string, workspaceIndex: number = 0): string {
+    let workspacePath = getWorkspacePath(workspaceIndex);
 
     while (true) {
         if (fs.existsSync(path.join(workspacePath, relativePath))) {
@@ -44,9 +53,11 @@ function combineAbsolutePath(relativePath: string): string {
 
 }
 
-const skipDirectories = [
+export const skipDirectories = [
     '.workspace_benchmark',
+    '.workspace_agent',
     'node_modules',
+    '.git',
 ];
 
 // Tool Call: grep
@@ -99,20 +110,22 @@ ${params.touch_file_end ? 'End of File' : '...'}
 /**
  * Search files for a pattern (text or regex) and include ±context lines.
  */
-export async function grep(args: GrepArgs): Promise<string> {
+export async function grep(args: GrepArgs, workspaceIndex: number = 0, questionIndex: number = 0): Promise<string> {
     const {
         pattern,
-        path = ".",
+        path: path_ = '.',
         regex = false,
         ignore_case = false,
     } = args;
 
     const context_lines = 10;
 
-    const searchPath = combineAbsolutePath(path);
+    const searchPath = combineAbsolutePath(path_, workspaceIndex);
+
+    const workspacePath = getWorkspacePath(workspaceIndex);
 
     if (searchPath === '') {
-        return `Path ${path} not existed`;
+        return `Path ${path_} not existed`;
     }
 
     const allFiles = fs.statSync(searchPath).isDirectory()
@@ -129,13 +142,19 @@ export async function grep(args: GrepArgs): Promise<string> {
         const content = fs.readFileSync(file, "utf-8");
         const lines = content.split("\n");
 
+        const ext = path.extname(file);
+
+        if (unreadableFileTypes.includes(ext) && ext !== '') {
+            continue;
+        }
+
         for (let i = 0; i < lines.length; i++) {
             if (searchRegex.test(lines[i])) {
                 const startContext = Math.max(0, i - context_lines);
                 const endContext = Math.min(lines.length - 1, i + context_lines);
 
                 results.push({
-                    path: file,
+                    path: toUnixPath(path.relative(workspacePath, file)),
                     line_number: i + 1,
                     match_line: lines[i].trim(),
                     context_before: lines.slice(startContext, i).map(l => l.trim()),
@@ -152,6 +171,13 @@ export async function grep(args: GrepArgs): Promise<string> {
 
     return `
 ${results.map((result, index) => {
+    if (evaluation) {
+        evaluationData[workspaceIndex].data[questionIndex]['candidateContexts'].push({
+            path: result.path,
+            startLine: result.line_number - result.context_before.length,
+            endLine: result.line_number + result.context_after.length,
+        });
+    }
     return grepResultToString(result, index);
 }).join('\n\n')}
     `.trim();
@@ -212,11 +238,13 @@ function mergeRelevantSnippets(snippets: RelevantSnippet[]): RelevantSnippet[] {
 export async function read(
     args: ReadFileArgs,
     question: string,
-    historyMessages: BaseMessage[]
+    historyMessages: BaseMessage[],
+    workspaceIndex: number = 0,
+    questionIndex: number = 0
 ): Promise<string> {
     let { path } = args;
 
-    const searchPath = combineAbsolutePath(path);
+    const searchPath = combineAbsolutePath(path, workspaceIndex);
     
     if (searchPath === '' || !fs.existsSync(searchPath)) {
         return `Path ${path} not existed`;
@@ -238,6 +266,13 @@ export async function read(
 ## Relevant File Snippets
 
 ${results.map(result => {
+    if (evaluation) {
+        evaluationData[workspaceIndex].data[questionIndex]['candidateContexts'].push({
+            path: path,
+            startLine: result.start_line,
+            endLine: result.end_line,
+        });
+    }
     return addLineNumber(readContent(result), result.start_line - 1);
 }).join('\n...\n')}
     `.trim();
@@ -305,7 +340,7 @@ ${historyMessages.map(message => {
     return JSON.stringify({
         'role': message.getType(),
         'content': parseMessageContent(message.content),
-    });
+    }, null, 4);
 }).join('\n\n')}
 
 ## File Content:

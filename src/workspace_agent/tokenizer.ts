@@ -15,7 +15,9 @@ export async function getTokenCount(message: BaseMessage): Promise<number> {
 
     const tokenizer = tokenizerInstance ?? await tokenizerPromise;
 
-    return tokenizer.encode(`${message.getType()}: ${message.content}`).length;
+    const tokens = tokenizer.encode(`${message.getType()}: ${message.content}`);
+
+    return tokens.length;
     
 }
 
